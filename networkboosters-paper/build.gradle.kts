@@ -41,6 +41,7 @@ tasks {
 
     shadowJar {
         archiveClassifier = ""
+        destinationDirectory = rootProject.layout.projectDirectory.dir("target")
         duplicatesStrategy = DuplicatesStrategy.INCLUDE
         mergeServiceFiles()
         append("META-INF/io.netty.versions.properties")

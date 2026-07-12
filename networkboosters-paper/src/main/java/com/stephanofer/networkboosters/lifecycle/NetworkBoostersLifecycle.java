@@ -34,7 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
+import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
@@ -47,6 +47,7 @@ public final class NetworkBoostersLifecycle implements Listener {
     private static final String PROBE_KEY_PREFIX = "__infrastructure_probe_";
 
     private final NetworkBoostersPlugin plugin;
+    private final ComponentLogger logger;
     private final PaperCommandManager.Bootstrapped<CommandSourceStack> commandManager;
     private final AtomicReference<LifecycleState> state = new AtomicReference<>(LifecycleState.NEW);
     private final AtomicLong generation = new AtomicLong();
@@ -64,6 +65,7 @@ public final class NetworkBoostersLifecycle implements Listener {
         PaperCommandManager.Bootstrapped<CommandSourceStack> commandManager
     ) {
         this.plugin = plugin;
+        this.logger = plugin.getComponentLogger();
         this.commandManager = commandManager;
     }
 
@@ -78,7 +80,7 @@ public final class NetworkBoostersLifecycle implements Listener {
 
         long started = System.nanoTime();
         long currentGeneration = this.generation.incrementAndGet();
-        this.plugin.getLogger().info("Starting NetworkBoosters " + this.plugin.getPluginMeta().getVersion());
+        this.logger.info("Starting NetworkBoosters {}", this.plugin.getPluginMeta().getVersion());
 
         try {
             this.commandManager.onEnable();
@@ -87,14 +89,14 @@ public final class NetworkBoostersLifecycle implements Listener {
             this.plugin.getServer().getPluginManager().registerEvents(this, this.plugin);
             this.startDatabase();
             this.startRedis(currentGeneration);
-            this.startZMenu();
+            // this.startZMenu();
             this.processAlreadyOnlinePlayers();
 
             this.state.set(LifecycleState.RUNNING);
-            this.plugin.getLogger().info("NetworkBoosters enabled in " + elapsedMillis(started) + " ms");
+            this.logger.info("NetworkBoosters enabled in {} ms", elapsedMillis(started));
         } catch (Throwable throwable) {
             this.state.set(LifecycleState.FAILED);
-            this.plugin.getLogger().log(Level.SEVERE, "NetworkBoosters failed during startup", throwable);
+            this.logger.error("NetworkBoosters failed during startup", throwable);
             this.closeStartedResources();
             this.plugin.getServer().getPluginManager().disablePlugin(this.plugin);
         }
@@ -110,7 +112,7 @@ public final class NetworkBoostersLifecycle implements Listener {
         this.generation.incrementAndGet();
         this.closeStartedResources();
         this.state.set(LifecycleState.STOPPED);
-        this.plugin.getLogger().info("NetworkBoosters stopped in " + elapsedMillis(started) + " ms");
+        this.logger.info("NetworkBoosters stopped in {} ms", elapsedMillis(started));
     }
 
     @EventHandler
@@ -121,8 +123,7 @@ public final class NetworkBoostersLifecycle implements Listener {
         }
 
         Player player = event.player();
-        this.plugin.getLogger().fine(() -> "Player settings ready for " + player.getUniqueId()
-            + " with language " + event.resolvedLanguage().code());
+        this.logger.info("Player settings ready for {} with language {}", player.getUniqueId(), event.resolvedLanguage().code());
     }
 
     private NetworkBoostersConfiguration loadConfiguration() {
@@ -146,7 +147,7 @@ public final class NetworkBoostersLifecycle implements Listener {
                     .build()
             );
             NetworkBoostersConfiguration loaded = NetworkBoostersConfiguration.load(document);
-            this.plugin.getLogger().info("Configuration loaded with BoostedYAML in " + elapsedMillis(started) + " ms");
+            this.logger.info("Configuration loaded with BoostedYAML in {} ms", elapsedMillis(started));
             return loaded;
         } catch (Exception exception) {
             throw new IllegalStateException("Failed to load config.yml with BoostedYAML", exception);
@@ -158,7 +159,7 @@ public final class NetworkBoostersLifecycle implements Listener {
         if (service == null) {
             throw new IllegalStateException("NetworkPlayerSettings is loaded but PlayerSettingsService is not registered");
         }
-        this.plugin.getLogger().info("NetworkPlayerSettings service resolved");
+        this.logger.info("NetworkPlayerSettings service resolved");
         return service;
     }
 
@@ -168,7 +169,7 @@ public final class NetworkBoostersLifecycle implements Listener {
         this.database = Databases.mysql(databaseConfig);
         this.database.migrate().join();
         this.runDatabaseProbe();
-        this.plugin.getLogger().info("Database connected, migrated and verified in " + elapsedMillis(started) + " ms");
+        this.logger.info("Database connected, migrated and verified in {} ms", elapsedMillis(started));
     }
 
     private void runDatabaseProbe() {
@@ -216,12 +217,13 @@ public final class NetworkBoostersLifecycle implements Listener {
             .multiplier(2.0)
             .jitterFactor(0.25)
             .classifier(com.hera.craftkit.database.SqlRetryClassifier.mysqlTransient())
-            .listener(event -> this.plugin.getLogger().warning(
-                "Retrying DB transaction after attempt " + event.failedAttempt()
-                    + "/" + event.maxAttempts()
-                    + " in " + event.nextDelayMillis()
-                    + " ms. SQLState=" + event.failure().getSQLState()
-                    + ", code=" + event.failure().getErrorCode()
+            .listener(event -> this.logger.warn(
+                "Retrying DB transaction after attempt {}/{} in {} ms. SQLState={}, code={}",
+                event.failedAttempt(),
+                event.maxAttempts(),
+                event.nextDelayMillis(),
+                event.failure().getSQLState(),
+                event.failure().getErrorCode()
             ))
             .build();
 
@@ -239,17 +241,21 @@ public final class NetworkBoostersLifecycle implements Listener {
             if (this.generation.get() != currentGeneration || this.state.get() == LifecycleState.STOPPING) {
                 return;
             }
-            this.plugin.getLogger().info("Redis status changed: " + status.state()
-                + " command=" + status.commandConnection()
-                + " pubsub=" + status.pubSubConnection()
-                + " subscriptions=" + status.activeSubscriptions() + "/" + status.requestedSubscriptions());
+            this.logger.info(
+                "Redis status changed: {} command={} pubsub={} subscriptions={}/{}",
+                status.state(),
+                status.commandConnection(),
+                status.pubSubConnection(),
+                status.activeSubscriptions(),
+                status.requestedSubscriptions()
+            );
         });
 
         String token = UUID.randomUUID().toString();
         String channel = this.redis.channel("networkboosters", "infrastructure-probe");
         this.redisProbeSubscription = this.redis.subscriber().subscribe(channel, message -> {
             if (this.generation.get() == currentGeneration && token.equals(message.payload())) {
-                this.plugin.getLogger().fine("Redis infrastructure probe received");
+                this.logger.info("Redis infrastructure probe received");
             }
         });
 
@@ -260,14 +266,17 @@ public final class NetworkBoostersLifecycle implements Listener {
                 return;
             }
             if (throwable != null) {
-                this.plugin.getLogger().log(Level.WARNING, "Redis probe is degraded; MySQL-backed features remain allowed", throwable);
+                this.logger.warn("Redis probe is degraded; MySQL-backed features remain allowed", throwable);
                 return;
             }
-            this.plugin.getLogger().info("Redis probe published to " + subscribers + " subscriber(s)");
+            this.logger.info("Redis probe published to {} subscriber(s)", subscribers);
         });
 
-        this.plugin.getLogger().info("Redis client created in " + elapsedMillis(started) + " ms with state "
-            + this.redis.operationalStatus().state());
+        this.logger.info(
+            "Redis client created in {} ms with state {}",
+            elapsedMillis(started),
+            this.redis.operationalStatus().state()
+        );
     }
 
     private void startZMenu() {
@@ -278,13 +287,13 @@ public final class NetworkBoostersLifecycle implements Listener {
             .inventories("inventories")
             .load();
         this.zmenu.reload();
-        this.plugin.getLogger().info("zMenu integration loaded and reload verified in " + elapsedMillis(started) + " ms");
+        this.logger.info("zMenu integration loaded and reload verified in {} ms", elapsedMillis(started));
     }
 
     private void processAlreadyOnlinePlayers() {
         for (Player player : this.plugin.getServer().getOnlinePlayers()) {
             if (this.playerSettings.isReady(player.getUniqueId())) {
-                this.plugin.getLogger().fine(() -> "Existing online player already settings-ready: " + player.getUniqueId());
+                this.logger.info("Existing online player already settings-ready: {}", player.getUniqueId());
             }
         }
     }
@@ -324,7 +333,7 @@ public final class NetworkBoostersLifecycle implements Listener {
         this.configuration = null;
 
         if (closeFailure != null) {
-            this.plugin.getLogger().log(Level.SEVERE, "One or more resources failed to close", closeFailure);
+            this.logger.error("One or more resources failed to close", closeFailure);
         }
     }
 

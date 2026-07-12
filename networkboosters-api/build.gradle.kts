@@ -1,3 +1,5 @@
+import org.gradle.jvm.tasks.Jar
+
 plugins {
     `java-library`
     `maven-publish`
@@ -6,6 +8,10 @@ plugins {
 java {
     withSourcesJar()
     withJavadocJar()
+}
+
+tasks.withType<Jar>().configureEach {
+    destinationDirectory = rootProject.layout.projectDirectory.dir("target-api")
 }
 
 dependencies {
