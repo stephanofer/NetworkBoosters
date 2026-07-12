@@ -14,11 +14,17 @@ import com.hera.craftkit.redis.RedisStatusRegistration;
 import com.hera.craftkit.redis.RedisSubscription;
 import com.hera.craftkit.zmenu.ZMenuIntegration;
 import com.hera.craftkit.zmenu.ZMenus;
+import com.stephanofer.networkboosters.api.NetworkBoostersService;
 import com.stephanofer.networkboosters.NetworkBoostersPlugin;
+import com.stephanofer.networkboosters.calculation.BoostCalculator;
 import com.stephanofer.networkboosters.config.ConfigurationLoader;
 import com.stephanofer.networkboosters.config.ConfigurationSnapshot;
 import com.stephanofer.networkboosters.config.ConfigurationStore;
 import com.stephanofer.networkboosters.config.NetworkBoostersConfiguration;
+import com.stephanofer.networkboosters.persistence.BoosterStorage;
+import com.stephanofer.networkboosters.player.PlayerSnapshotCache;
+import com.stephanofer.networkboosters.player.PlayerStateLoader;
+import com.stephanofer.networkboosters.service.NetworkBoostersServiceImpl;
 import com.stephanofer.networkplayersettings.settings.api.PlayerSettingsService;
 import com.stephanofer.networkplayersettings.settings.event.PlayerSettingsReadyEvent;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -26,6 +32,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
@@ -36,6 +43,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.plugin.ServicePriority;
 import org.incendo.cloud.paper.PaperCommandManager;
 
 public final class NetworkBoostersLifecycle implements Listener {
@@ -52,6 +61,9 @@ public final class NetworkBoostersLifecycle implements Listener {
 
     private PlayerSettingsService playerSettings;
     private Database database;
+    private BoosterStorage boosterStorage;
+    private PlayerSnapshotCache playerSnapshotCache;
+    private NetworkBoostersServiceImpl boostersService;
     private RedisClient redis;
     private RedisStatusRegistration redisStatusRegistration;
     private RedisSubscription redisProbeSubscription;
@@ -85,6 +97,7 @@ public final class NetworkBoostersLifecycle implements Listener {
             this.playerSettings = this.resolvePlayerSettings();
             this.plugin.getServer().getPluginManager().registerEvents(this, this.plugin);
             this.startDatabase();
+            this.startPlayerState();
             this.startRedis(currentGeneration);
             this.startZMenu();
             this.processAlreadyOnlinePlayers();
@@ -121,6 +134,14 @@ public final class NetworkBoostersLifecycle implements Listener {
 
         Player player = event.player();
         this.logger.info("Player settings ready for {} with language {}", player.getUniqueId(), event.resolvedLanguage().code());
+        this.loadPlayerSnapshot(player.getUniqueId(), this.generation.get());
+    }
+
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        if (this.playerSnapshotCache != null) {
+            this.playerSnapshotCache.unload(event.getPlayer().getUniqueId());
+        }
     }
 
     private void loadConfiguration() {
@@ -153,7 +174,34 @@ public final class NetworkBoostersLifecycle implements Listener {
         this.database = Databases.mysql(databaseConfig);
         this.database.migrate().join();
         this.runDatabaseProbe();
+        this.boosterStorage = new BoosterStorage(this.database, event -> this.logger.warn(
+            "Retrying NetworkBoosters DB transaction after attempt {}/{} in {} ms. SQLState={}, code={}",
+            event.failedAttempt(),
+            event.maxAttempts(),
+            event.nextDelayMillis(),
+            event.failure().getSQLState(),
+            event.failure().getErrorCode()
+        ));
         this.logger.info("Database connected, migrated and verified in {} ms", elapsedMillis(started));
+    }
+
+    private void startPlayerState() {
+        long started = System.nanoTime();
+        PlayerStateLoader stateLoader = new PlayerStateLoader(this.boosterStorage);
+        this.playerSnapshotCache = new PlayerSnapshotCache(stateLoader);
+        this.boostersService = new NetworkBoostersServiceImpl(
+            this.configurationStore,
+            this.playerSnapshotCache,
+            new BoostCalculator(),
+            Clock.systemUTC()
+        );
+        this.plugin.getServer().getServicesManager().register(
+            NetworkBoostersService.class,
+            this.boostersService,
+            this.plugin,
+            ServicePriority.Normal
+        );
+        this.logger.info("NetworkBoosters service registered in {} ms", elapsedMillis(started));
     }
 
     private void runDatabaseProbe() {
@@ -279,11 +327,38 @@ public final class NetworkBoostersLifecycle implements Listener {
     }
 
     private void processAlreadyOnlinePlayers() {
+        long currentGeneration = this.generation.get();
         for (Player player : this.plugin.getServer().getOnlinePlayers()) {
             if (this.playerSettings.isReady(player.getUniqueId())) {
                 this.logger.info("Existing online player already settings-ready: {}", player.getUniqueId());
+                this.loadPlayerSnapshot(player.getUniqueId(), currentGeneration);
             }
         }
+    }
+
+    private void loadPlayerSnapshot(UUID playerId, long capturedGeneration) {
+        PlayerSnapshotCache cache = this.playerSnapshotCache;
+        if (cache == null || this.state.get() == LifecycleState.STOPPING) {
+            return;
+        }
+        cache.load(playerId).whenComplete((snapshot, failure) -> {
+            if (this.generation.get() != capturedGeneration || this.state.get() == LifecycleState.STOPPING) {
+                return;
+            }
+            this.plugin.getServer().getScheduler().runTask(this.plugin, () -> {
+                if (this.generation.get() != capturedGeneration || this.state.get() == LifecycleState.STOPPING) {
+                    return;
+                }
+                if (failure != null) {
+                    this.logger.error("Failed to load boosters snapshot for {}", playerId, failure);
+                    return;
+                }
+                Player player = this.plugin.getServer().getPlayer(playerId);
+                if (player != null && player.isOnline()) {
+                    this.logger.info("Boosters snapshot ready for {} at revision {}", playerId, snapshot.revision());
+                }
+            });
+        });
     }
 
     private void closeStartedResources() {
@@ -291,6 +366,18 @@ public final class NetworkBoostersLifecycle implements Listener {
         this.plugin.getServer().getScheduler().cancelTasks(this.plugin);
 
         RuntimeException closeFailure = null;
+        closeFailure = close("NetworkBoosters service", closeFailure, () -> {
+            if (this.boostersService != null) {
+                this.plugin.getServer().getServicesManager().unregister(NetworkBoostersService.class, this.boostersService);
+                this.boostersService = null;
+            }
+        });
+        closeFailure = close("Player snapshot cache", closeFailure, () -> {
+            if (this.playerSnapshotCache != null) {
+                this.playerSnapshotCache.close();
+                this.playerSnapshotCache = null;
+            }
+        });
         closeFailure = close("Redis probe subscription", closeFailure, () -> {
             if (this.redisProbeSubscription != null) {
                 this.redisProbeSubscription.close();
@@ -316,6 +403,7 @@ public final class NetworkBoostersLifecycle implements Listener {
             }
         });
 
+        this.boosterStorage = null;
         this.zmenu = null;
         this.playerSettings = null;
         this.configurationStore.clear();

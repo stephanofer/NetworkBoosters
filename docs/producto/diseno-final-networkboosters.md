@@ -1538,7 +1538,6 @@ La organización sigue responsabilidades visibles y evita capas ceremoniales con
 - zMenu API;
 - PlaceholderAPI `compileOnly`;
 - JUnit;
-- Testcontainers MySQL para integración.
 
 ### 27.2 No requeridas inicialmente
 
@@ -1737,7 +1736,7 @@ Logs útiles y sin spam:
 15. Implementar zMenu y flujos de confirmación.
 16. Implementar PlaceholderAPI.
 17. Añadir warnings y actualización visual.
-18. Añadir tests unitarios y Testcontainers.
+18. Añadir tests unitarios e integración MySQL.
 19. Documentar API de consumo.
 20. Integrar NetworkProgression con `10 points -> 20 points`.
 21. Ejecutar pruebas de concurrencia, reinicio y Redis degradado.

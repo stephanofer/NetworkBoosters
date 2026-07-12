@@ -168,7 +168,7 @@ Este bloque se limita a persistir, cargar y consultar estado. Las mutaciones fun
 - la revisión impide que una carga antigua reemplace un snapshot nuevo;
 - las lecturas cacheadas no realizan I/O;
 - un fallo de auditoría revierte la transacción correspondiente;
-- las pruebas de integración MySQL aplicables al bloque pasan.
+- las pruebas automatizadas aplicables al bloque pasan.
 
 ### Detalle de referencia
 
@@ -435,7 +435,7 @@ Consultar principalmente las secciones 25, 28 a 31, 33 y 34 del diseño final.
 | 0. Infraestructura base | Terminado | Ninguna |
 | 1. Contratos y dominio | Terminado | Bloque 0 |
 | 2. Configuración y definiciones | Terminado | Bloque 1 |
-| 3. Persistencia, revisiones y snapshots | Pendiente | Bloques 1 y 2 |
+| 3. Persistencia, revisiones y snapshots | Terminado | Bloques 1 y 2 |
 | 4. Inventario, capacidad y claims | Pendiente | Bloque 3 |
 | 5. Activaciones, colas y cálculo | Pendiente | Bloque 4 |
 | 6. Transferencias | Pendiente | Bloque 5 |
