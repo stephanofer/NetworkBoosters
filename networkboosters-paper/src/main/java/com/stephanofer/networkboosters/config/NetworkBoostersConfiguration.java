@@ -247,6 +247,8 @@ public record NetworkBoostersConfiguration(
     public record Activation(
         Duration maximumTotalDuration,
         int maximumQueuedEntries,
+        Duration expiryCheckInterval,
+        int expiryBatchSize,
         List<Duration> expiryWarnings
     ) {
 
@@ -254,6 +256,10 @@ public record NetworkBoostersConfiguration(
             requirePositive(maximumTotalDuration, "maximumTotalDuration");
             if (maximumQueuedEntries < 0) {
                 throw new IllegalArgumentException("maximumQueuedEntries cannot be negative");
+            }
+            requirePositive(expiryCheckInterval, "expiryCheckInterval");
+            if (expiryBatchSize < 1) {
+                throw new IllegalArgumentException("expiryBatchSize must be positive");
             }
             expiryWarnings = List.copyOf(Objects.requireNonNull(expiryWarnings, "expiryWarnings"));
             for (Duration warning : expiryWarnings) {
@@ -424,8 +430,13 @@ public record NetworkBoostersConfiguration(
         int issueCount = issues.size();
         Duration maximumTotalDuration = requiredPositiveDuration(activation, "maximum-total-duration", "activation.maximum-total-duration", issues);
         Integer maximumQueuedEntries = requiredInt(activation, "maximum-queued-entries", "activation.maximum-queued-entries", issues);
+        Duration expiryCheckInterval = optionalPositiveDuration(activation, "expiry-check-interval", "activation.expiry-check-interval", "1s", issues);
+        Integer expiryBatchSize = optionalInt(activation, "expiry-batch-size", "activation.expiry-batch-size", 100, issues);
         if (maximumQueuedEntries != null && maximumQueuedEntries < 0) {
             error(issues, "activation.maximum-queued-entries", "Cannot be negative");
+        }
+        if (expiryBatchSize != null && expiryBatchSize < 1) {
+            error(issues, "activation.expiry-batch-size", "Must be positive");
         }
         List<Duration> warnings = durationList(activation, "expiry-warnings", "activation.expiry-warnings", issues);
         if (maximumTotalDuration != null) {
@@ -442,8 +453,9 @@ public record NetworkBoostersConfiguration(
         }
         warnings.sort((left, right) -> right.compareTo(left));
         return issues.size() > issueCount || maximumTotalDuration == null || maximumQueuedEntries == null
+            || expiryCheckInterval == null || expiryBatchSize == null
             ? null
-            : new Activation(maximumTotalDuration, maximumQueuedEntries, warnings);
+            : new Activation(maximumTotalDuration, maximumQueuedEntries, expiryCheckInterval, expiryBatchSize, warnings);
     }
 
     private static InventoryLimits parseInventoryLimits(Section inventoryLimits, List<ConfigurationIssue> issues) {

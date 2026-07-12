@@ -19,6 +19,7 @@ import com.stephanofer.networkboosters.api.result.DeactivationResult;
 import com.stephanofer.networkboosters.api.result.InventoryMutationResult;
 import com.stephanofer.networkboosters.api.result.TransferResult;
 import com.stephanofer.networkboosters.calculation.BoostCalculator;
+import com.stephanofer.networkboosters.booster.ActivationMutationService;
 import com.stephanofer.networkboosters.config.ConfigurationStore;
 import com.stephanofer.networkboosters.inventory.InventoryMutationService;
 import com.stephanofer.networkboosters.player.PlayerSnapshotCache;
@@ -34,6 +35,7 @@ public final class NetworkBoostersServiceImpl implements NetworkBoostersService 
     private final ConfigurationStore configurationStore;
     private final PlayerSnapshotCache snapshots;
     private final BoostCalculator calculator;
+    private final ActivationMutationService activationMutations;
     private final InventoryMutationService inventoryMutations;
     private final Clock clock;
 
@@ -41,12 +43,14 @@ public final class NetworkBoostersServiceImpl implements NetworkBoostersService 
         ConfigurationStore configurationStore,
         PlayerSnapshotCache snapshots,
         BoostCalculator calculator,
+        ActivationMutationService activationMutations,
         InventoryMutationService inventoryMutations,
         Clock clock
     ) {
         this.configurationStore = Objects.requireNonNull(configurationStore, "configurationStore");
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
         this.calculator = Objects.requireNonNull(calculator, "calculator");
+        this.activationMutations = Objects.requireNonNull(activationMutations, "activationMutations");
         this.inventoryMutations = Objects.requireNonNull(inventoryMutations, "inventoryMutations");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -98,7 +102,7 @@ public final class NetworkBoostersServiceImpl implements NetworkBoostersService 
 
     @Override
     public CompletableFuture<ActivationResult> activate(ActivationRequest request) {
-        return notImplementedYet("activate is implemented in block 5");
+        return this.activationMutations.activate(request);
     }
 
     @Override
@@ -128,7 +132,7 @@ public final class NetworkBoostersServiceImpl implements NetworkBoostersService 
 
     @Override
     public CompletableFuture<DeactivationResult> deactivate(DeactivationRequest request) {
-        return notImplementedYet("deactivate is implemented in block 5");
+        return this.activationMutations.deactivate(request);
     }
 
     private static <T> CompletableFuture<T> notImplementedYet(String message) {

@@ -48,6 +48,41 @@ public final class InventoryRepository {
         }
     }
 
+    public OptionalLong amountForUpdate(Connection connection, UUID playerId, BoosterId boosterId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "SELECT amount FROM " + this.table + " WHERE player_uuid = ? AND booster_id = ? FOR UPDATE"
+        )) {
+            JdbcUuid.set(statement, 1, playerId);
+            statement.setString(2, boosterId.value());
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) {
+                    return OptionalLong.empty();
+                }
+                return OptionalLong.of(unsignedLong(result, "amount"));
+            }
+        }
+    }
+
+    public boolean decrementOne(Connection connection, UUID playerId, BoosterId boosterId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "UPDATE " + this.table + " SET amount = amount - 1 WHERE player_uuid = ? AND booster_id = ? AND amount >= 1"
+        )) {
+            JdbcUuid.set(statement, 1, playerId);
+            statement.setString(2, boosterId.value());
+            if (statement.executeUpdate() != 1) {
+                return false;
+            }
+        }
+        try (PreparedStatement statement = connection.prepareStatement(
+            "DELETE FROM " + this.table + " WHERE player_uuid = ? AND booster_id = ? AND amount = 0"
+        )) {
+            JdbcUuid.set(statement, 1, playerId);
+            statement.setString(2, boosterId.value());
+            statement.executeUpdate();
+        }
+        return true;
+    }
+
     public void add(Connection connection, UUID playerId, BoosterId boosterId, long amount) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
             INSERT INTO %s (player_uuid, booster_id, amount)

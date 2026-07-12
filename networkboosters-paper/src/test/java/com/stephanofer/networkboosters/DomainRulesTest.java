@@ -133,6 +133,9 @@ class DomainRulesTest {
 
         assertFalse(QueueCompatibility.matches(activeX2SameId, x3));
 
+        BoosterDefinition sameBehaviorDifferentPolicy = definition(BoosterId.of("personal_points"), BigDecimal.valueOf(2), ConflictPolicy.REJECT);
+        assertTrue(QueueCompatibility.matches(activeX2SameId, sameBehaviorDifferentPolicy));
+
         BoosterDefinition changedRequirements = new BoosterDefinition(
             x3.id(),
             x3.target(),
@@ -174,6 +177,9 @@ class DomainRulesTest {
         assertEquals(ActivationStatus.EXTENDED, extended.status());
         assertEquals(ActivationDecisionType.EXTEND_ACTIVE, extended.type());
         assertEquals(Duration.ofHours(3), extended.resultingActiveRemaining().orElseThrow());
+
+        BoosterDefinition x2RejectPolicy = definition(BoosterId.of("personal_points_x2"), BigDecimal.valueOf(2), ConflictPolicy.REJECT);
+        assertEquals(ActivationStatus.EXTENDED, engine.decide(input(x2RejectPolicy, 1, Optional.of(activeX2), List.of(), true)).status());
 
         BoosterDefinition x3 = definition(BoosterId.of("personal_points_x3"), BigDecimal.valueOf(3), ConflictPolicy.QUEUE);
         QueuedBooster queuedX3 = queuedBooster(x3, Duration.ofHours(2), 0);

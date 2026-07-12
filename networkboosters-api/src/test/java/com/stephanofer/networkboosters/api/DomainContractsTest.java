@@ -25,6 +25,8 @@ import com.stephanofer.networkboosters.api.result.ActivationResult;
 import com.stephanofer.networkboosters.api.result.ActivationStatus;
 import com.stephanofer.networkboosters.api.result.ClaimResult;
 import com.stephanofer.networkboosters.api.result.ClaimResultStatus;
+import com.stephanofer.networkboosters.api.result.DeactivationResult;
+import com.stephanofer.networkboosters.api.result.DeactivationStatus;
 import com.stephanofer.networkboosters.api.result.InventoryMutationResult;
 import com.stephanofer.networkboosters.api.result.InventoryMutationStatus;
 import com.stephanofer.networkboosters.api.source.ActivationSource;
@@ -154,6 +156,13 @@ class DomainContractsTest {
             InventoryMutationStatus.CLAIM_CREATED, BoosterId.of("personal_points_x2"), 0, 0, Optional.empty()));
         assertThrows(IllegalArgumentException.class, () -> new InventoryMutationResult(
             InventoryMutationStatus.UNCHANGED, BoosterId.of("personal_points_x2"), 1, 2, Optional.empty()));
+
+        assertThrows(IllegalArgumentException.class, () -> new DeactivationResult(
+            DeactivationStatus.NOT_FOUND, Optional.of(active), Optional.empty()));
+        assertEquals(active, new DeactivationResult(
+            DeactivationStatus.DEACTIVATED, Optional.of(active), Optional.of(active)).promotedBooster().orElseThrow());
+        assertEquals(active, new DeactivationResult(
+            DeactivationStatus.EXPIRED, Optional.of(active), Optional.empty()).deactivatedBooster().orElseThrow());
     }
 
     private static BoosterDefinition definition(BigDecimal multiplier, Duration duration) {

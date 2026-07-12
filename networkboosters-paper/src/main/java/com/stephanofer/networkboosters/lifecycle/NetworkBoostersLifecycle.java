@@ -16,6 +16,9 @@ import com.hera.craftkit.zmenu.ZMenuIntegration;
 import com.hera.craftkit.zmenu.ZMenus;
 import com.stephanofer.networkboosters.api.NetworkBoostersService;
 import com.stephanofer.networkboosters.NetworkBoostersPlugin;
+import com.stephanofer.networkboosters.booster.ActivationMutationService;
+import com.stephanofer.networkboosters.booster.ExpirationCoordinator;
+import com.stephanofer.networkboosters.booster.PlayerPermissionProvider;
 import com.stephanofer.networkboosters.calculation.BoostCalculator;
 import com.stephanofer.networkboosters.config.ConfigurationLoader;
 import com.stephanofer.networkboosters.config.ConfigurationSnapshot;
@@ -64,6 +67,8 @@ public final class NetworkBoostersLifecycle implements Listener {
     private Database database;
     private BoosterStorage boosterStorage;
     private PlayerSnapshotCache playerSnapshotCache;
+    private ActivationMutationService activationMutationService;
+    private ExpirationCoordinator expirationCoordinator;
     private NetworkBoostersServiceImpl boostersService;
     private RedisClient redis;
     private RedisStatusRegistration redisStatusRegistration;
@@ -188,12 +193,20 @@ public final class NetworkBoostersLifecycle implements Listener {
 
     private void startPlayerState() {
         long started = System.nanoTime();
-        PlayerStateLoader stateLoader = new PlayerStateLoader(this.boosterStorage);
+        PlayerStateLoader stateLoader = new PlayerStateLoader();
         this.playerSnapshotCache = new PlayerSnapshotCache(stateLoader);
+        this.activationMutationService = new ActivationMutationService(
+            this.boosterStorage,
+            this.playerSnapshotCache,
+            this.configurationStore,
+            new PlayerPermissionProvider(this.plugin.getServer(), this.plugin)
+        );
+        stateLoader.initializeReconciler(this.activationMutationService::reconcilePlayerState);
         this.boostersService = new NetworkBoostersServiceImpl(
             this.configurationStore,
             this.playerSnapshotCache,
             new BoostCalculator(),
+            this.activationMutationService,
             new InventoryMutationService(this.boosterStorage, this.playerSnapshotCache, this.configurationStore, this.plugin.getServer()),
             Clock.systemUTC()
         );
@@ -203,6 +216,13 @@ public final class NetworkBoostersLifecycle implements Listener {
             this.plugin,
             ServicePriority.Normal
         );
+        this.expirationCoordinator = new ExpirationCoordinator(
+            this.plugin,
+            this.logger,
+            this.configurationStore,
+            this.activationMutationService
+        );
+        this.expirationCoordinator.start();
         this.logger.info("NetworkBoosters service registered in {} ms", elapsedMillis(started));
     }
 
@@ -372,6 +392,18 @@ public final class NetworkBoostersLifecycle implements Listener {
             if (this.boostersService != null) {
                 this.plugin.getServer().getServicesManager().unregister(NetworkBoostersService.class, this.boostersService);
                 this.boostersService = null;
+            }
+        });
+        closeFailure = close("NetworkBoosters expiration coordinator", closeFailure, () -> {
+            if (this.expirationCoordinator != null) {
+                this.expirationCoordinator.close();
+                this.expirationCoordinator = null;
+            }
+        });
+        closeFailure = close("NetworkBoosters activation mutations", closeFailure, () -> {
+            if (this.activationMutationService != null) {
+                this.activationMutationService.close();
+                this.activationMutationService = null;
             }
         });
         closeFailure = close("Player snapshot cache", closeFailure, () -> {

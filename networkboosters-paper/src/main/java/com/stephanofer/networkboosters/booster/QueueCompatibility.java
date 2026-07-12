@@ -17,7 +17,6 @@ public final class QueueCompatibility {
             && activeBooster.target().equals(definition.target())
             && activeBooster.multiplier().compareTo(definition.multiplier()) == 0
             && activeBooster.activationGroup().equals(definition.activationGroup())
-            && activeBooster.conflictPolicy() == definition.conflictPolicy()
             && activeBooster.scope().equals(definition.scope())
             && activeBooster.requirements().equals(definition.requirements());
     }
@@ -29,7 +28,6 @@ public final class QueueCompatibility {
             && queuedBooster.target().equals(definition.target())
             && queuedBooster.multiplier().compareTo(definition.multiplier()) == 0
             && queuedBooster.activationGroup().equals(definition.activationGroup())
-            && queuedBooster.conflictPolicy() == definition.conflictPolicy()
             && queuedBooster.scope().equals(definition.scope())
             && queuedBooster.requirements().equals(definition.requirements());
     }

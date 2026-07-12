@@ -31,6 +31,8 @@ class NetworkBoostersConfigurationTest {
         assertEquals(new BigDecimal("10").stripTrailingZeros(), config.limits().maximumMultiplier());
         assertEquals(Duration.ofDays(7), config.activation().maximumTotalDuration());
         assertEquals(20, config.activation().maximumQueuedEntries());
+        assertEquals(Duration.ofSeconds(1), config.activation().expiryCheckInterval());
+        assertEquals(100, config.activation().expiryBatchSize());
         assertEquals(Duration.ofMinutes(5), config.activation().expiryWarnings().getFirst());
         assertEquals(30, config.inventoryLimits().fallback());
         assertEquals(2, config.inventoryLimits().tiers().size());
@@ -62,6 +64,7 @@ class NetworkBoostersConfigurationTest {
             activation:
               maximum-total-duration: 7d
               maximum-queued-entries: -1
+              expiry-batch-size: 0
               expiry-warnings:
                 - 7d
             inventory-limits:
@@ -77,6 +80,7 @@ class NetworkBoostersConfigurationTest {
         assertTrue(exception.issues().stream().anyMatch(issue -> issue.path().equals("config-version")));
         assertTrue(exception.issues().stream().anyMatch(issue -> issue.path().equals("storage.pool.maximum-size")));
         assertTrue(exception.issues().stream().anyMatch(issue -> issue.path().equals("limits.maximum-multiplier")));
+        assertTrue(exception.issues().stream().anyMatch(issue -> issue.path().equals("activation.expiry-batch-size")));
         assertTrue(exception.issues().stream().anyMatch(issue -> issue.path().equals("commands.aliases[0]")));
     }
 
@@ -145,6 +149,8 @@ class NetworkBoostersConfigurationTest {
             activation:
               maximum-total-duration: 7d
               maximum-queued-entries: 20
+              expiry-check-interval: 1s
+              expiry-batch-size: 100
               expiry-warnings:
                 - 5m
                 - 1m

@@ -3,6 +3,8 @@ package com.stephanofer.networkboosters.persistence;
 import com.hera.craftkit.database.Database;
 import com.hera.craftkit.database.TransactionOptions;
 import com.hera.craftkit.database.TransactionRetryEvent;
+import com.stephanofer.networkboosters.booster.ActivationRepository;
+import com.stephanofer.networkboosters.booster.BoosterQueueRepository;
 import com.stephanofer.networkboosters.api.player.PlayerBoostSnapshot;
 import com.stephanofer.networkboosters.inventory.ClaimRepository;
 import com.stephanofer.networkboosters.inventory.InventoryRepository;
@@ -10,6 +12,7 @@ import com.stephanofer.networkboosters.inventory.MutationReceiptRepository;
 import com.stephanofer.networkboosters.persistence.transaction.BoosterTransactionOptions;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -20,6 +23,8 @@ public final class BoosterStorage {
     private final Database database;
     private final PlayerStateRepository playerStates;
     private final PlayerRevisionRepository revisions;
+    private final ActivationRepository activations;
+    private final BoosterQueueRepository queue;
     private final AuditLogRepository auditLog;
     private final InventoryRepository inventory;
     private final ClaimRepository claims;
@@ -32,6 +37,8 @@ public final class BoosterStorage {
         SnapshotJsonCodec json = new SnapshotJsonCodec();
         PlayerSnapshotMapper mapper = new PlayerSnapshotMapper(json);
         this.revisions = new PlayerRevisionRepository(database.table("player_revision"));
+        this.activations = new ActivationRepository(database.table("activations"), mapper, json);
+        this.queue = new BoosterQueueRepository(database.table("queue"), mapper, json);
         this.inventory = new InventoryRepository(database.table("inventory"));
         this.claims = new ClaimRepository(database.table("claims"), mapper);
         this.mutationReceipts = new MutationReceiptRepository(database.table("mutation_receipts"));
@@ -58,12 +65,27 @@ public final class BoosterStorage {
         return this.database.transaction(options, operation::execute);
     }
 
+    public CompletableFuture<List<ActivationRepository.ExpiredActivationCandidate>> findExpiredActivationCandidates(int limit) {
+        if (limit < 1) {
+            throw new IllegalArgumentException("limit must be positive");
+        }
+        return this.database.query(connection -> this.activations.findExpiredCandidates(connection, limit));
+    }
+
     public PlayerStateRepository playerStates() {
         return this.playerStates;
     }
 
     public PlayerRevisionRepository revisions() {
         return this.revisions;
+    }
+
+    public ActivationRepository activations() {
+        return this.activations;
+    }
+
+    public BoosterQueueRepository queue() {
+        return this.queue;
     }
 
     public AuditLogRepository auditLog() {
