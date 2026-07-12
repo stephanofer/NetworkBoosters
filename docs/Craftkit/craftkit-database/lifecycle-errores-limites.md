@@ -58,6 +58,7 @@ Ejemplos de errores envueltos:
 - fallo en update;
 - fallo en operación;
 - fallo en transacción;
+- agotamiento de retry transaccional;
 - fallo en Flyway;
 - uso después de cerrar;
 - configuración inválida;
@@ -87,7 +88,8 @@ El mensaje al fallar la creación del datasource usa host, puerto y database, pe
 - helpers de savepoints;
 - health checks;
 - métricas;
-- integración con Testcontainers o MySQL real en tests.
+- retry automático global;
+- retry de queries/updates fuera de transacción.
 
 Estos límites son intencionales para mantener el módulo ligero y enfocado en infraestructura crítica.
 
@@ -106,4 +108,6 @@ La suite de tests cubre:
 - configuración Flyway con placeholders/history table;
 - estrategias `FAIL`, `BASELINE_AT_ZERO`, `BASELINE_AT_VERSION`;
 - transacciones con commit/rollback/restauración de estado;
-- executor de transacciones.
+- executor de transacciones;
+- retry transaccional unitario para deadlock/lock timeout;
+- integración con MySQL real mediante Testcontainers para deadlock y lock wait timeout.

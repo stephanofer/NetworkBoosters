@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS `${tablePrefix}metadata` (
+    key_name VARCHAR(128) NOT NULL,
+    value_text VARCHAR(512) NOT NULL,
+    updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (key_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

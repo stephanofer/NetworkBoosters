@@ -9,6 +9,7 @@ CraftKit es una librería interna modular. Cada módulo se documenta por separad
 | Módulo | Estado | Documentación |
 | --- | --- | --- |
 | `craftkit-database` | Implementado | [Base de datos MySQL](./craftkit-database/README.md) |
+| `craftkit-feedback` | Implementado | [Feedback localizado para Paper/Adventure](./craftkit-feedback/README.md) |
 | `craftkit-paper` | Implementado | [Utilidades Paper/Adventure](./craftkit-paper/README.md) |
 | `craftkit-redis` | Implementado | [Redis, caché, sets, Pub/Sub y coordinación](./craftkit-redis/README.md) |
 | `craftkit-zmenu` | Implementado | [Integración con zMenu](./craftkit-zmenu/README.md) |

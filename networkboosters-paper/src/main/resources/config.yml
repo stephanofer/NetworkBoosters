@@ -1,0 +1,34 @@
+config-version: 1
+
+server:
+  id: "development-01"
+  game-id: "development"
+
+storage:
+  host: "127.0.0.1"
+  port: 3306
+  database: "hera_network"
+  username: "networkboosters"
+  password: ""
+  table-prefix: "network_booster_"
+  pool:
+    maximum-size: 10
+    minimum-idle: 2
+    connection-timeout: 10s
+    validation-timeout: 5s
+    shutdown-timeout: 10s
+
+redis:
+  host: "127.0.0.1"
+  port: 6379
+  database: 0
+  username: ""
+  password: ""
+  ssl: false
+  verify-peer: true
+  environment: "development"
+  key-prefix: "hera"
+  command-timeout: 3s
+  connect-timeout: 3s
+  shutdown-timeout: 5s
+  auto-reconnect: true

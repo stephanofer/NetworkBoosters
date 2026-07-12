@@ -192,6 +192,7 @@ Builder methods:
 ```java
 isolation(TransactionIsolation)
 readOnly(boolean)
+retryPolicy(TransactionRetryPolicy)
 build()
 ```
 
@@ -200,6 +201,7 @@ Getters:
 ```java
 isolation()
 readOnly()
+retryPolicy()
 ```
 
 ## `TransactionIsolation`
@@ -220,6 +222,103 @@ shouldApply()
 ```
 
 `DEFAULT` tiene `jdbcLevel() == null` y `shouldApply() == false`.
+
+## `TransactionRetryPolicy`
+
+Factories:
+
+```java
+none()
+mysqlTransient()
+builder()
+```
+
+Builder methods:
+
+```java
+maxAttempts(int)
+initialDelayMillis(long)
+maxDelayMillis(long)
+multiplier(double)
+jitterFactor(double)
+classifier(SqlRetryClassifier)
+listener(TransactionRetryListener)
+build()
+```
+
+Getters:
+
+```java
+maxAttempts()
+initialDelayMillis()
+maxDelayMillis()
+multiplier()
+jitterFactor()
+classifier()
+listener()
+nextDelayMillis(int failedAttempt)
+```
+
+`maxAttempts` incluye el primer intento.
+
+`none()` es el default de `TransactionOptions` y no reintenta.
+
+`mysqlTransient()` usa:
+
+```text
+maxAttempts = 3
+initialDelayMillis = 25
+maxDelayMillis = 250
+multiplier = 2.0
+jitterFactor = 0.25
+classifier = SqlRetryClassifier.mysqlTransient()
+listener = TransactionRetryListener.noop()
+```
+
+## `SqlRetryClassifier`
+
+```java
+boolean isRetryable(SQLException exception)
+```
+
+Factories:
+
+```java
+never()
+mysqlTransient()
+```
+
+`mysqlTransient()` cubre:
+
+| Condición | Error code | SQLState habitual |
+| --- | ---: | --- |
+| Deadlock | `1213` | `40001` |
+| Lock wait timeout | `1205` | `HY000` |
+
+También revisa la cadena `SQLException#getNextException()`.
+
+## `TransactionRetryListener`
+
+```java
+void onRetry(TransactionRetryEvent event)
+```
+
+Factory:
+
+```java
+noop()
+```
+
+El listener es observacional. Si falla, el retry continúa y el fallo del listener se agrega como `suppressed` al fallo del intento.
+
+## `TransactionRetryEvent`
+
+```java
+int failedAttempt()
+int maxAttempts()
+long nextDelayMillis()
+SQLException failure()
+```
 
 ## `DatabaseException`
 

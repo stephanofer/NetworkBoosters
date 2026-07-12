@@ -11,7 +11,7 @@ El módulo es **Paper-free**: no depende de Paper/Bukkit y no agenda callbacks a
 - Evita usar `ForkJoinPool.commonPool()` o `CompletableFuture.supplyAsync(...)` sin executor explícito.
 - Integra Flyway `12.8.1` con placeholders y tabla de historial prefijada.
 - Soporta bases compartidas con tablas de otros plugins mediante `ExistingSchemaStrategy.BASELINE_AT_ZERO`.
-- Proporciona transacciones con una sola conexión, `commit`, `rollback`, isolation level opcional y restauración del estado de la conexión.
+- Proporciona transacciones con una sola conexión, `commit`, `rollback`, isolation level opcional, restauración del estado de la conexión y retry transaccional opt-in para fallos concurrentes MySQL.
 - Obliga al consumidor a cerrar explícitamente `Database` en shutdown.
 
 ## Dependencias del módulo
@@ -64,4 +64,5 @@ CraftKit proporciona:
 - migraciones Flyway;
 - validaciones;
 - transacciones;
+- retry transaccional opt-in;
 - cierre y errores base.

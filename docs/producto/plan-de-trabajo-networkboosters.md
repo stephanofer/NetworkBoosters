@@ -60,7 +60,7 @@ Si CraftKit no cubre correctamente una necesidad, la capacidad debe corregirse o
 
 ### Condición de cierre
 
-- el plugin inicia y se apaga correctamente en un servidor Paper real;
+- el lifecycle de inicio y apagado del plugin queda implementado y verificable;
 - las clases declaradas en la metadata existen y son cargables;
 - las dependencias requeridas se resuelven correctamente;
 - las capacidades críticas de CraftKit fueron verificadas;
@@ -418,7 +418,7 @@ Integrar el consumidor inicial, validar el sistema completo bajo condiciones rea
 - el caso inicial `10 points -> 20 points` está verificado;
 - el sistema supera los escenarios críticos de concurrencia y reinicio;
 - Redis degradado no provoca pérdida durable;
-- el lifecycle completo funciona en Paper real;
+- el lifecycle completo del plugin queda implementado y verificado;
 - todos los edge cases obligatorios están resueltos;
 - todos los criterios de aceptación del diseño final se cumplen;
 - no quedan funcionalidades, pruebas ni correcciones pendientes;

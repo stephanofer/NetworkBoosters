@@ -1,3 +1,5 @@
+import java.util.zip.ZipFile
+
 plugins {
     java
     alias(libs.plugins.shadow)
@@ -17,6 +19,10 @@ dependencies {
     implementation(libs.boosted.yaml)
     implementation(libs.cloud.paper)
     implementation(libs.cloud.minecraft.extras)
+
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.paper.api)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 tasks {
@@ -57,11 +63,74 @@ tasks {
         relocate("reactor", "com.stephanofer.networkboosters.libs.reactor")
         relocate("org.reactivestreams", "com.stephanofer.networkboosters.libs.reactiveStreams")
         relocate("dev.dejvokep.boostedyaml", "com.stephanofer.networkboosters.libs.boostedyaml")
+        relocate("org.snakeyaml.engine", "com.stephanofer.networkboosters.libs.snakeyamlEngine")
         relocate("org.incendo.cloud", "com.stephanofer.networkboosters.libs.cloud")
         relocate("io.leangen.geantyref", "com.stephanofer.networkboosters.libs.geantyref")
     }
 
+    test {
+        useJUnitPlatform()
+    }
+
+    val shadowJarTask = named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar")
+    val shadowArchiveFile = shadowJarTask.flatMap { it.archiveFile }
+
+    val verifyShadowJar by registering {
+        dependsOn(shadowJarTask)
+        inputs.file(shadowArchiveFile)
+
+        doLast {
+            val jarFile = shadowArchiveFile.get().asFile
+            val entries = ZipFile(jarFile).use { zip ->
+                zip.entries().asSequence().map { it.name }.toSet()
+            }
+
+            val requiredEntries = listOf(
+                "paper-plugin.yml",
+                "com/stephanofer/networkboosters/NetworkBoostersPlugin.class",
+                "com/stephanofer/networkboosters/NetworkBoostersBootstrap.class",
+                "com/stephanofer/networkboosters/NetworkBoostersLoader.class"
+            )
+
+            val missingEntries = requiredEntries.filterNot(entries::contains)
+            check(missingEntries.isEmpty()) {
+                "Shadow JAR is missing required plugin entries: ${missingEntries.joinToString()}"
+            }
+
+            val forbiddenPrefixes = listOf(
+                "com/hera/craftkit/",
+                "com/zaxxer/",
+                "org/flywaydb/",
+                "tools/jackson/",
+                "com/fasterxml/jackson/",
+                "com/mysql/",
+                "com/google/protobuf/",
+                "io/lettuce/",
+                "redis/clients/authentication/",
+                "io/netty/",
+                "reactor/",
+                "org/reactivestreams/",
+                "dev/dejvokep/boostedyaml/",
+                "org/snakeyaml/engine/",
+                "org/incendo/cloud/",
+                "io/leangen/geantyref/",
+                "com/stephanofer/networkplayersettings/",
+                "fr/maxlego08/menu/",
+                "me/clip/placeholderapi/"
+            )
+
+            val leakedEntries = entries.filter { entry ->
+                forbiddenPrefixes.any(entry::startsWith)
+            }
+
+            check(leakedEntries.isEmpty()) {
+                "Shadow JAR contains unrelocated or external API entries: ${leakedEntries.take(20).joinToString()}"
+            }
+        }
+    }
+
     assemble {
         dependsOn(shadowJar)
+        dependsOn(verifyShadowJar)
     }
 }

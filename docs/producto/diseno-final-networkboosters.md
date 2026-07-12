@@ -1537,7 +1537,7 @@ La organización sigue responsabilidades visibles y evita capas ceremoniales con
 - NetworkPlayerSettings API;
 - zMenu API;
 - PlaceholderAPI `compileOnly`;
-- JUnit 5;
+- JUnit;
 - Testcontainers MySQL para integración.
 
 ### 27.2 No requeridas inicialmente
