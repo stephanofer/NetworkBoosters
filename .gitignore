@@ -1,0 +1,11 @@
+.gradle/
+.idea/
+build/
+
+Boosters/
+adventure/
+boosted-yaml/
+caffeine/
+cloud-minecraft/
+zAuctionHouse/
+zMenu/
