@@ -1,0 +1,33 @@
+config-version: 1
+
+id: personal_points_x2
+enabled: true
+
+target: network_progression:points
+multiplier: 2.0
+duration: 2h
+
+scope:
+  type: PERSONAL
+  games:
+    - "*"
+  servers:
+    - "*"
+
+activation:
+  group: personal-points
+  conflict-policy: QUEUE
+  requirements:
+    permissions: []
+    mode: ALL
+
+transfer:
+  enabled: true
+  minimum-amount: 1
+  maximum-amount: 5
+  cooldown: 30s
+  permission: ""
+
+display:
+  order: 100
+  category: points

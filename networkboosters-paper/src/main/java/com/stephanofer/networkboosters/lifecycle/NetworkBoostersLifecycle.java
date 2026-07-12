@@ -15,16 +15,13 @@ import com.hera.craftkit.redis.RedisSubscription;
 import com.hera.craftkit.zmenu.ZMenuIntegration;
 import com.hera.craftkit.zmenu.ZMenus;
 import com.stephanofer.networkboosters.NetworkBoostersPlugin;
+import com.stephanofer.networkboosters.config.ConfigurationLoader;
+import com.stephanofer.networkboosters.config.ConfigurationSnapshot;
+import com.stephanofer.networkboosters.config.ConfigurationStore;
 import com.stephanofer.networkboosters.config.NetworkBoostersConfiguration;
 import com.stephanofer.networkplayersettings.settings.api.PlayerSettingsService;
 import com.stephanofer.networkplayersettings.settings.event.PlayerSettingsReadyEvent;
-import dev.dejvokep.boostedyaml.YamlDocument;
-import dev.dejvokep.boostedyaml.dvs.versioning.BasicVersioning;
-import dev.dejvokep.boostedyaml.settings.loader.LoaderSettings;
-import dev.dejvokep.boostedyaml.settings.updater.UpdaterSettings;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
-import java.io.File;
-import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -51,8 +48,8 @@ public final class NetworkBoostersLifecycle implements Listener {
     private final PaperCommandManager.Bootstrapped<CommandSourceStack> commandManager;
     private final AtomicReference<LifecycleState> state = new AtomicReference<>(LifecycleState.NEW);
     private final AtomicLong generation = new AtomicLong();
+    private final ConfigurationStore configurationStore = new ConfigurationStore();
 
-    private NetworkBoostersConfiguration configuration;
     private PlayerSettingsService playerSettings;
     private Database database;
     private RedisClient redis;
@@ -84,7 +81,7 @@ public final class NetworkBoostersLifecycle implements Listener {
 
         try {
             this.commandManager.onEnable();
-            this.configuration = this.loadConfiguration();
+            this.loadConfiguration();
             this.playerSettings = this.resolvePlayerSettings();
             this.plugin.getServer().getPluginManager().registerEvents(this, this.plugin);
             this.startDatabase();
@@ -126,31 +123,18 @@ public final class NetworkBoostersLifecycle implements Listener {
         this.logger.info("Player settings ready for {} with language {}", player.getUniqueId(), event.resolvedLanguage().code());
     }
 
-    private NetworkBoostersConfiguration loadConfiguration() {
+    private void loadConfiguration() {
         long started = System.nanoTime();
-        File configFile = new File(this.plugin.getDataFolder(), "config.yml");
-        try (InputStream defaults = this.plugin.getResource("config.yml")) {
-            if (defaults == null) {
-                throw new IllegalStateException("Missing embedded config.yml resource");
-            }
-
-            YamlDocument document = YamlDocument.create(
-                configFile,
-                defaults,
-                LoaderSettings.builder()
-                    .setAutoUpdate(true)
-                    .setAllowDuplicateKeys(false)
-                    .setErrorLabel("NetworkBoosters config.yml")
-                    .build(),
-                UpdaterSettings.builder()
-                    .setVersioning(new BasicVersioning("config-version"))
-                    .build()
-            );
-            NetworkBoostersConfiguration loaded = NetworkBoostersConfiguration.load(document);
-            this.logger.info("Configuration loaded with BoostedYAML in {} ms", elapsedMillis(started));
-            return loaded;
-        } catch (Exception exception) {
-            throw new IllegalStateException("Failed to load config.yml with BoostedYAML", exception);
+        ConfigurationLoader loader = new ConfigurationLoader(this.plugin.getDataFolder(), this.plugin::getResource);
+        ConfigurationSnapshot snapshot = this.configurationStore.initialize(loader.load());
+        this.logger.info(
+            "Configuration loaded in {} ms with {} booster definition(s)",
+            elapsedMillis(started),
+            snapshot.definitions().size()
+        );
+        snapshot.warnings().forEach(issue -> this.logger.warn("{}:{} - {}", issue.file(), issue.path(), issue.message()));
+        if (!snapshot.definitionChanges().added().isEmpty()) {
+            this.logger.info("Loaded new booster definitions: {}", snapshot.definitionChanges().added());
         }
     }
 
@@ -165,7 +149,7 @@ public final class NetworkBoostersLifecycle implements Listener {
 
     private void startDatabase() {
         long started = System.nanoTime();
-        DatabaseConfig databaseConfig = this.configuration.storage().toDatabaseConfig(this.plugin.getClass().getClassLoader());
+        DatabaseConfig databaseConfig = this.configuration().storage().toDatabaseConfig(this.plugin.getClass().getClassLoader());
         this.database = Databases.mysql(databaseConfig);
         this.database.migrate().join();
         this.runDatabaseProbe();
@@ -234,8 +218,12 @@ public final class NetworkBoostersLifecycle implements Listener {
     }
 
     private void startRedis(long currentGeneration) {
+        if (!this.configuration().redis().enabled()) {
+            this.logger.warn("Redis is disabled in config.yml; cross-server invalidation will be unavailable");
+            return;
+        }
         long started = System.nanoTime();
-        RedisConfig redisConfig = this.configuration.redis().toRedisConfig(this.configuration.serverId());
+        RedisConfig redisConfig = this.configuration().redis().toRedisConfig(this.configuration().serverId());
         this.redis = RedisClients.lettuce(redisConfig, RedisStartupMode.RECOVER);
         this.redisStatusRegistration = this.redis.observeOperationalStatus(status -> {
             if (this.generation.get() != currentGeneration || this.state.get() == LifecycleState.STOPPING) {
@@ -330,7 +318,7 @@ public final class NetworkBoostersLifecycle implements Listener {
 
         this.zmenu = null;
         this.playerSettings = null;
-        this.configuration = null;
+        this.configurationStore.clear();
 
         if (closeFailure != null) {
             this.logger.error("One or more resources failed to close", closeFailure);
@@ -379,6 +367,10 @@ public final class NetworkBoostersLifecycle implements Listener {
             statement.setString(1, key);
             return statement.executeUpdate();
         }
+    }
+
+    private NetworkBoostersConfiguration configuration() {
+        return this.configurationStore.requireCurrent().configuration();
     }
 
     private static Throwable rootCause(Throwable throwable) {

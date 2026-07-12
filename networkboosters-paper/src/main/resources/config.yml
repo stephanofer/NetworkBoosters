@@ -19,6 +19,7 @@ storage:
     shutdown-timeout: 10s
 
 redis:
+  enabled: true
   host: "127.0.0.1"
   port: 6379
   database: 0
@@ -32,3 +33,38 @@ redis:
   connect-timeout: 3s
   shutdown-timeout: 5s
   auto-reconnect: true
+  reconciliation-interval: 30s
+  degraded-reconciliation-interval: 5s
+
+limits:
+  maximum-multiplier: 10.0
+
+activation:
+  maximum-total-duration: 7d
+  maximum-queued-entries: 20
+  expiry-warnings:
+    - 5m
+    - 1m
+    - 10s
+
+inventory-limits:
+  fallback: 30
+  tiers:
+    phantom:
+      permission: "networkboosters.capacity.phantom"
+      maximum: 60
+      priority: 100
+
+    legend:
+      permission: "networkboosters.capacity.legend"
+      maximum: 100
+      priority: 200
+
+commands:
+  root: boosters
+  aliases:
+    - booster
+    - boosts
+
+placeholderapi:
+  enabled: true

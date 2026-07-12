@@ -2,6 +2,7 @@ package com.stephanofer.networkboosters.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.dejvokep.boostedyaml.YamlDocument;
 import dev.dejvokep.boostedyaml.dvs.versioning.BasicVersioning;
@@ -9,6 +10,8 @@ import dev.dejvokep.boostedyaml.settings.loader.LoaderSettings;
 import dev.dejvokep.boostedyaml.settings.updater.UpdaterSettings;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
@@ -16,40 +19,7 @@ class NetworkBoostersConfigurationTest {
 
     @Test
     void loadsValidConfiguration() throws IOException {
-        NetworkBoostersConfiguration config = NetworkBoostersConfiguration.load(document("""
-                config-version: 1
-                server:
-                  id: test-01
-                  game-id: skywars
-                storage:
-                  host: 127.0.0.1
-                  port: 3306
-                  database: hera_network
-                  username: networkboosters
-                  password: secret
-                  table-prefix: network_booster_
-                  pool:
-                    maximum-size: 8
-                    minimum-idle: 2
-                    connection-timeout: 10s
-                    validation-timeout: 5s
-                    shutdown-timeout: 3s
-                redis:
-                  host: 127.0.0.1
-                  port: 6379
-                  database: 0
-                  username: ""
-                  password: secret
-                  ssl: false
-                  verify-peer: true
-                  key-prefix: hera
-                  environment: test
-                  command-timeout: 3s
-                  connect-timeout: 2s
-                  shutdown-timeout: 1s
-                  auto-reconnect: true
-                """
-        ));
+        NetworkBoostersConfiguration config = NetworkBoostersConfiguration.load(document(validConfig()));
 
         assertEquals("test-01", config.serverId());
         assertEquals("skywars", config.gameId());
@@ -57,18 +27,85 @@ class NetworkBoostersConfigurationTest {
         assertEquals(Duration.ofSeconds(3), config.storage().shutdownTimeout());
         assertEquals("test", config.redis().environment());
         assertEquals(Duration.ofSeconds(2), config.redis().connectTimeout());
+        assertEquals(Duration.ofSeconds(30), config.redis().reconciliationInterval());
+        assertEquals(new BigDecimal("10").stripTrailingZeros(), config.limits().maximumMultiplier());
+        assertEquals(Duration.ofDays(7), config.activation().maximumTotalDuration());
+        assertEquals(20, config.activation().maximumQueuedEntries());
+        assertEquals(Duration.ofMinutes(5), config.activation().expiryWarnings().getFirst());
+        assertEquals(30, config.inventoryLimits().fallback());
+        assertEquals(2, config.inventoryLimits().tiers().size());
+        assertEquals("boosters", config.commands().root());
+        assertTrue(config.placeholderApi().enabled());
     }
 
     @Test
-    void rejectsUnsupportedVersion() throws IOException {
-        YamlDocument yaml = document("config-version: 2");
+    void rejectsUnsupportedVersionAndKeepsAllIssues() throws IOException {
+        ConfigurationException exception = assertThrows(ConfigurationException.class, () -> NetworkBoostersConfiguration.load(document("""
+            config-version: 2
+            server:
+              id: test-01
+              game-id: skywars
+            storage:
+              host: 127.0.0.1
+              port: 3306
+              database: hera_network
+              username: networkboosters
+              pool:
+                maximum-size: 0
+                minimum-idle: 2
+            redis:
+              host: 127.0.0.1
+              key-prefix: hera
+              environment: test
+            limits:
+              maximum-multiplier: 0
+            activation:
+              maximum-total-duration: 7d
+              maximum-queued-entries: -1
+              expiry-warnings:
+                - 7d
+            inventory-limits:
+              fallback: -1
+            commands:
+              root: boosters
+              aliases:
+                - boosters
+            placeholderapi:
+              enabled: true
+            """)));
 
-        assertThrows(IllegalArgumentException.class, () -> NetworkBoostersConfiguration.load(yaml));
+        assertTrue(exception.issues().stream().anyMatch(issue -> issue.path().equals("config-version")));
+        assertTrue(exception.issues().stream().anyMatch(issue -> issue.path().equals("storage.pool.maximum-size")));
+        assertTrue(exception.issues().stream().anyMatch(issue -> issue.path().equals("limits.maximum-multiplier")));
+        assertTrue(exception.issues().stream().anyMatch(issue -> issue.path().equals("commands.aliases[0]")));
     }
 
     @Test
-    void rejectsInvalidDurations() throws IOException {
-        YamlDocument yaml = document("""
+    void supportsHourAndDayDurationsButRejectsAmbiguousValues() throws IOException {
+        NetworkBoostersConfiguration config = NetworkBoostersConfiguration.load(document(validConfig()
+            .replace("connection-timeout: 10s", "connection-timeout: 1m")
+            .replace("maximum-total-duration: 7d", "maximum-total-duration: 24h")));
+
+        assertEquals(Duration.ofMinutes(1), config.storage().connectionTimeout());
+        assertEquals(Duration.ofHours(24), config.activation().maximumTotalDuration());
+
+        ConfigurationException exception = assertThrows(ConfigurationException.class, () -> NetworkBoostersConfiguration.load(document(validConfig()
+            .replace("maximum-total-duration: 7d", "maximum-total-duration: 1.5h"))));
+
+        assertTrue(exception.issues().stream().anyMatch(issue -> issue.path().equals("activation.maximum-total-duration")));
+    }
+
+    @Test
+    void exposesImmutableCollections() throws IOException {
+        NetworkBoostersConfiguration config = NetworkBoostersConfiguration.load(document(validConfig()));
+
+        assertThrows(UnsupportedOperationException.class, () -> config.commands().aliases().add("other"));
+        assertThrows(UnsupportedOperationException.class, () -> config.activation().expiryWarnings().add(Duration.ofSeconds(1)));
+        assertThrows(UnsupportedOperationException.class, () -> config.inventoryLimits().tiers().clear());
+    }
+
+    static String validConfig() {
+        return """
             config-version: 1
             server:
               id: test-01
@@ -83,22 +120,58 @@ class NetworkBoostersConfigurationTest {
               pool:
                 maximum-size: 8
                 minimum-idle: 2
-                connection-timeout: 0s
+                connection-timeout: 10s
                 validation-timeout: 5s
                 shutdown-timeout: 3s
             redis:
+              enabled: true
               host: 127.0.0.1
               port: 6379
               database: 0
+              username: ""
+              password: secret
+              ssl: false
+              verify-peer: true
               key-prefix: hera
               environment: test
-            """);
-
-        assertThrows(IllegalArgumentException.class, () -> NetworkBoostersConfiguration.load(yaml));
+              command-timeout: 3s
+              connect-timeout: 2s
+              shutdown-timeout: 1s
+              auto-reconnect: true
+              reconciliation-interval: 30s
+              degraded-reconciliation-interval: 5s
+            limits:
+              maximum-multiplier: 10.0
+            activation:
+              maximum-total-duration: 7d
+              maximum-queued-entries: 20
+              expiry-warnings:
+                - 5m
+                - 1m
+                - 10s
+            inventory-limits:
+              fallback: 30
+              tiers:
+                phantom:
+                  permission: networkboosters.capacity.phantom
+                  maximum: 60
+                  priority: 100
+                legend:
+                  permission: networkboosters.capacity.legend
+                  maximum: 100
+                  priority: 200
+            commands:
+              root: boosters
+              aliases:
+                - booster
+                - boosts
+            placeholderapi:
+              enabled: true
+            """;
     }
 
-    private static YamlDocument document(String content) throws IOException {
-        byte[] bytes = content.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    static YamlDocument document(String content) throws IOException {
+        byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
         return YamlDocument.create(
             new ByteArrayInputStream(bytes),
             new ByteArrayInputStream(bytes),
