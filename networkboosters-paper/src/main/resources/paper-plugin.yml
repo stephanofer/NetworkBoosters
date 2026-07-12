@@ -1,0 +1,26 @@
+name: NetworkBoosters
+version: '${version}'
+
+main: com.stephanofer.networkboosters.NetworkBoostersPlugin
+bootstrapper: com.stephanofer.networkboosters.NetworkBoostersBootstrap
+loader: com.stephanofer.networkboosters.NetworkBoostersLoader
+api-version: '26.1'
+load: POSTWORLD
+
+authors: [ stephanofer ]
+website: stephanofer.com
+
+dependencies:
+  server:
+    NetworkPlayerSettings:
+      load: BEFORE
+      required: true
+      join-classpath: true
+    zMenu:
+      load: BEFORE
+      required: true
+      join-classpath: true
+    PlaceholderAPI:
+      load: BEFORE
+      required: false
+      join-classpath: true

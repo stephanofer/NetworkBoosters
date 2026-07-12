@@ -1,25 +1,34 @@
 plugins {
-    id("java-library")
+    base
+    alias(libs.plugins.shadow) apply false
 }
 
-repositories {
-    mavenCentral()
-    maven("https://repo.papermc.io/repository/maven-public/")
+allprojects {
+    group = providers.gradleProperty("group").get()
+    version = providers.gradleProperty("version").get()
+
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        maven("https://repo.papermc.io/repository/maven-public/")
+        maven("https://repo.extendedclip.com/releases/")
+        maven("https://repo.groupez.dev/releases")
+    }
 }
 
-dependencies {
-    compileOnly(libs.paper.api)
-}
+subprojects {
+    plugins.withType<JavaPlugin> {
+        extensions.configure<JavaPluginExtension> {
+            toolchain.languageVersion = JavaLanguageVersion.of(25)
+        }
 
-java {
-    toolchain.languageVersion = JavaLanguageVersion.of(25)
-}
-
-tasks {
-    processResources {
-        val props = mapOf("version" to version)
-        filesMatching("paper-plugin.yml") {
-            expand(props)
+        tasks.withType<JavaCompile>().configureEach {
+            options.encoding = "UTF-8"
+            options.release = 25
         }
     }
+}
+
+tasks.build {
+    dependsOn(subprojects.map { it.tasks.named("build") })
 }

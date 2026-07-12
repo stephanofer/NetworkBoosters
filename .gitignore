@@ -2,10 +2,10 @@
 .idea/
 build/
 
-Boosters/
-adventure/
-boosted-yaml/
-caffeine/
-cloud-minecraft/
-zAuctionHouse/
-zMenu/
+# Boosters/
+#adventure/
+#boosted-yaml/
+#caffeine/
+#cloud-minecraft/
+#zAuctionHouse/
+#zMenu/
