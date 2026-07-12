@@ -25,6 +25,8 @@ import com.stephanofer.networkboosters.api.result.ActivationResult;
 import com.stephanofer.networkboosters.api.result.ActivationStatus;
 import com.stephanofer.networkboosters.api.result.ClaimResult;
 import com.stephanofer.networkboosters.api.result.ClaimResultStatus;
+import com.stephanofer.networkboosters.api.result.InventoryMutationResult;
+import com.stephanofer.networkboosters.api.result.InventoryMutationStatus;
 import com.stephanofer.networkboosters.api.source.ActivationSource;
 import com.stephanofer.networkboosters.api.source.ClaimSource;
 import com.stephanofer.networkboosters.api.source.SourceReference;
@@ -147,6 +149,11 @@ class DomainContractsTest {
             ClaimSource.SYSTEM, SourceReference.none(), Instant.EPOCH, Optional.empty(), ClaimStatus.PENDING);
         assertThrows(IllegalArgumentException.class, () -> new ClaimResult(
             ClaimResultStatus.CLAIMED, Optional.of(pending), 1));
+
+        assertThrows(IllegalArgumentException.class, () -> new InventoryMutationResult(
+            InventoryMutationStatus.CLAIM_CREATED, BoosterId.of("personal_points_x2"), 0, 0, Optional.empty()));
+        assertThrows(IllegalArgumentException.class, () -> new InventoryMutationResult(
+            InventoryMutationStatus.UNCHANGED, BoosterId.of("personal_points_x2"), 1, 2, Optional.empty()));
     }
 
     private static BoosterDefinition definition(BigDecimal multiplier, Duration duration) {

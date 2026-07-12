@@ -43,6 +43,20 @@ public final class PlayerSnapshotCache implements AutoCloseable {
         return this.snapshots.containsKey(Objects.requireNonNull(playerId, "playerId"));
     }
 
+    public void publish(PlayerBoostSnapshot snapshot) {
+        Objects.requireNonNull(snapshot, "snapshot");
+        UUID playerId = snapshot.playerId();
+        this.snapshots.compute(playerId, (ignored, current) -> {
+            if (!this.accepting.get() || current == null) {
+                return current;
+            }
+            if (current == null || snapshot.revision() > current.revision()) {
+                return snapshot;
+            }
+            return current;
+        });
+    }
+
     public CompletableFuture<PlayerBoostSnapshot> load(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
         PlayerBoostSnapshot snapshot = this.snapshots.get(playerId);

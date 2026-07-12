@@ -109,5 +109,4 @@ La suite de tests cubre:
 - estrategias `FAIL`, `BASELINE_AT_ZERO`, `BASELINE_AT_VERSION`;
 - transacciones con commit/rollback/restauración de estado;
 - executor de transacciones;
-- retry transaccional unitario para deadlock/lock timeout;
-- integración con MySQL real mediante Testcontainers para deadlock y lock wait timeout.
+- retry transaccional unitario para deadlock/lock timeout.

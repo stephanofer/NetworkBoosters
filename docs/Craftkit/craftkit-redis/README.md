@@ -24,9 +24,6 @@ El módulo es **Paper-free**: no depende de Paper/Bukkit y no agenda callbacks a
 
 ```kotlin
 implementation(libs.lettuce.core)
-testImplementation(libs.testcontainers)
-testImplementation(libs.testcontainers.junit.jupiter)
-testImplementation(libs.testcontainers.toxiproxy)
 ```
 
 Versión actual en `gradle/libs.versions.toml`:
@@ -34,9 +31,8 @@ Versión actual en `gradle/libs.versions.toml`:
 | Librería | Versión |
 | --- | --- |
 | Lettuce Core | `7.6.0.RELEASE` |
-| Testcontainers | `1.21.2` (solo tests) |
 
-Lettuce está como `implementation` porque la API pública de CraftKit no expone sus tipos. Testcontainers y Toxiproxy solo se usan para pruebas de integración y no forman parte del runtime publicado.
+Lettuce está como `implementation` porque la API pública de CraftKit no expone sus tipos.
 
 ## Documentos de esta sección
 

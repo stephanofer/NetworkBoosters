@@ -32,13 +32,14 @@ public final class PlayerRevisionRepository {
     }
 
     public long revisionForUpdate(Connection connection, UUID playerId) throws SQLException {
+        this.ensureRow(connection, playerId);
         try (PreparedStatement statement = connection.prepareStatement(
             "SELECT revision FROM " + this.table + " WHERE player_uuid = ? FOR UPDATE"
         )) {
             JdbcUuid.set(statement, 1, playerId);
             try (ResultSet result = statement.executeQuery()) {
                 if (!result.next()) {
-                    return 0;
+                    throw new SQLException("Expected revision row for " + playerId + " after initialization");
                 }
                 return readRevision(result, "revision", playerId);
             }
@@ -52,17 +53,6 @@ public final class PlayerRevisionRepository {
         }
 
         long next = current + 1;
-        if (current == 0) {
-            try (PreparedStatement statement = connection.prepareStatement(
-                "INSERT INTO " + this.table + " (player_uuid, revision) VALUES (?, ?)"
-            )) {
-                JdbcUuid.set(statement, 1, playerId);
-                statement.setLong(2, next);
-                statement.executeUpdate();
-            }
-            return next;
-        }
-
         try (PreparedStatement statement = connection.prepareStatement(
             "UPDATE " + this.table + " SET revision = ? WHERE player_uuid = ?"
         )) {
@@ -74,6 +64,16 @@ public final class PlayerRevisionRepository {
             }
         }
         return next;
+    }
+
+    private void ensureRow(Connection connection, UUID playerId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "INSERT INTO " + this.table + " (player_uuid, revision) VALUES (?, 0) " +
+                "ON DUPLICATE KEY UPDATE player_uuid = player_uuid"
+        )) {
+            JdbcUuid.set(statement, 1, playerId);
+            statement.executeUpdate();
+        }
     }
 
     private static long readRevision(ResultSet result, String column, UUID playerId) throws SQLException {

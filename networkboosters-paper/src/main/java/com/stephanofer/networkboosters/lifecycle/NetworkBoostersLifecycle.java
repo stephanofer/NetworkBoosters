@@ -21,6 +21,7 @@ import com.stephanofer.networkboosters.config.ConfigurationLoader;
 import com.stephanofer.networkboosters.config.ConfigurationSnapshot;
 import com.stephanofer.networkboosters.config.ConfigurationStore;
 import com.stephanofer.networkboosters.config.NetworkBoostersConfiguration;
+import com.stephanofer.networkboosters.inventory.InventoryMutationService;
 import com.stephanofer.networkboosters.persistence.BoosterStorage;
 import com.stephanofer.networkboosters.player.PlayerSnapshotCache;
 import com.stephanofer.networkboosters.player.PlayerStateLoader;
@@ -193,6 +194,7 @@ public final class NetworkBoostersLifecycle implements Listener {
             this.configurationStore,
             this.playerSnapshotCache,
             new BoostCalculator(),
+            new InventoryMutationService(this.boosterStorage, this.playerSnapshotCache, this.configurationStore, this.plugin.getServer()),
             Clock.systemUTC()
         );
         this.plugin.getServer().getServicesManager().register(

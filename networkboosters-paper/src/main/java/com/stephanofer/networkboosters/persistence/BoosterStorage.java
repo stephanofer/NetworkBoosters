@@ -4,6 +4,9 @@ import com.hera.craftkit.database.Database;
 import com.hera.craftkit.database.TransactionOptions;
 import com.hera.craftkit.database.TransactionRetryEvent;
 import com.stephanofer.networkboosters.api.player.PlayerBoostSnapshot;
+import com.stephanofer.networkboosters.inventory.ClaimRepository;
+import com.stephanofer.networkboosters.inventory.InventoryRepository;
+import com.stephanofer.networkboosters.inventory.MutationReceiptRepository;
 import com.stephanofer.networkboosters.persistence.transaction.BoosterTransactionOptions;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -18,6 +21,9 @@ public final class BoosterStorage {
     private final PlayerStateRepository playerStates;
     private final PlayerRevisionRepository revisions;
     private final AuditLogRepository auditLog;
+    private final InventoryRepository inventory;
+    private final ClaimRepository claims;
+    private final MutationReceiptRepository mutationReceipts;
     private final Consumer<TransactionRetryEvent> retryListener;
 
     public BoosterStorage(Database database, Consumer<TransactionRetryEvent> retryListener) {
@@ -26,6 +32,9 @@ public final class BoosterStorage {
         SnapshotJsonCodec json = new SnapshotJsonCodec();
         PlayerSnapshotMapper mapper = new PlayerSnapshotMapper(json);
         this.revisions = new PlayerRevisionRepository(database.table("player_revision"));
+        this.inventory = new InventoryRepository(database.table("inventory"));
+        this.claims = new ClaimRepository(database.table("claims"), mapper);
+        this.mutationReceipts = new MutationReceiptRepository(database.table("mutation_receipts"));
         this.playerStates = new PlayerStateRepository(
             database.table("inventory"),
             database.table("activations"),
@@ -59,6 +68,18 @@ public final class BoosterStorage {
 
     public AuditLogRepository auditLog() {
         return this.auditLog;
+    }
+
+    public InventoryRepository inventory() {
+        return this.inventory;
+    }
+
+    public ClaimRepository claims() {
+        return this.claims;
+    }
+
+    public MutationReceiptRepository mutationReceipts() {
+        return this.mutationReceipts;
     }
 
     @FunctionalInterface

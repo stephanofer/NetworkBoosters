@@ -62,6 +62,43 @@ class PlayerSnapshotCacheTest {
     }
 
     @Test
+    void publishReplacesOnlyWithNewerRevisionAndDoesNotReviveUnloadedPlayers() {
+        UUID playerId = UUID.randomUUID();
+        PlayerSnapshotCache cache = new PlayerSnapshotCache(
+            id -> CompletableFuture.completedFuture(snapshot(id, 1)),
+            () -> {
+            }
+        );
+
+        cache.load(playerId).join();
+
+        cache.publish(snapshot(playerId, 2));
+        assertEquals(2, cache.cached(playerId).orElseThrow().revision());
+        cache.publish(snapshot(playerId, 1));
+        assertEquals(2, cache.cached(playerId).orElseThrow().revision());
+
+        cache.unload(playerId);
+        cache.publish(snapshot(playerId, 3));
+        assertFalse(cache.isReady(playerId));
+    }
+
+    @Test
+    void publishAfterCloseDoesNotReenterCache() {
+        UUID playerId = UUID.randomUUID();
+        PlayerSnapshotCache cache = new PlayerSnapshotCache(
+            id -> CompletableFuture.completedFuture(snapshot(id, 1)),
+            () -> {
+            }
+        );
+
+        cache.load(playerId).join();
+        cache.close();
+
+        cache.publish(snapshot(playerId, 2));
+        assertFalse(cache.isReady(playerId));
+    }
+
+    @Test
     void completedLoadIsRemovedBeforeTheNextRefresh() {
         UUID playerId = UUID.randomUUID();
         AtomicInteger loads = new AtomicInteger();

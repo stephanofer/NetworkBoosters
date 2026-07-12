@@ -20,6 +20,7 @@ import com.stephanofer.networkboosters.api.result.InventoryMutationResult;
 import com.stephanofer.networkboosters.api.result.TransferResult;
 import com.stephanofer.networkboosters.calculation.BoostCalculator;
 import com.stephanofer.networkboosters.config.ConfigurationStore;
+import com.stephanofer.networkboosters.inventory.InventoryMutationService;
 import com.stephanofer.networkboosters.player.PlayerSnapshotCache;
 import java.time.Clock;
 import java.util.Collection;
@@ -33,17 +34,20 @@ public final class NetworkBoostersServiceImpl implements NetworkBoostersService 
     private final ConfigurationStore configurationStore;
     private final PlayerSnapshotCache snapshots;
     private final BoostCalculator calculator;
+    private final InventoryMutationService inventoryMutations;
     private final Clock clock;
 
     public NetworkBoostersServiceImpl(
         ConfigurationStore configurationStore,
         PlayerSnapshotCache snapshots,
         BoostCalculator calculator,
+        InventoryMutationService inventoryMutations,
         Clock clock
     ) {
         this.configurationStore = Objects.requireNonNull(configurationStore, "configurationStore");
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
         this.calculator = Objects.requireNonNull(calculator, "calculator");
+        this.inventoryMutations = Objects.requireNonNull(inventoryMutations, "inventoryMutations");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -99,17 +103,17 @@ public final class NetworkBoostersServiceImpl implements NetworkBoostersService 
 
     @Override
     public CompletableFuture<InventoryMutationResult> grant(InventoryGrantRequest request) {
-        return notImplementedYet("grant is implemented in block 4");
+        return this.inventoryMutations.grant(request);
     }
 
     @Override
     public CompletableFuture<InventoryMutationResult> revoke(InventoryRevokeRequest request) {
-        return notImplementedYet("revoke is implemented in block 4");
+        return this.inventoryMutations.revoke(request);
     }
 
     @Override
     public CompletableFuture<InventoryMutationResult> setInventoryAmount(InventorySetRequest request) {
-        return notImplementedYet("setInventoryAmount is implemented in block 4");
+        return this.inventoryMutations.setInventoryAmount(request);
     }
 
     @Override
@@ -119,7 +123,7 @@ public final class NetworkBoostersServiceImpl implements NetworkBoostersService 
 
     @Override
     public CompletableFuture<ClaimResult> claim(ClaimRequest request) {
-        return notImplementedYet("claim is implemented in block 4");
+        return this.inventoryMutations.claim(request);
     }
 
     @Override

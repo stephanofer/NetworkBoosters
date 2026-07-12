@@ -1,6 +1,7 @@
 package com.stephanofer.networkboosters.api.result;
 
 import com.stephanofer.networkboosters.api.booster.BoosterId;
+import com.stephanofer.networkboosters.api.player.BoosterClaim;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -9,7 +10,7 @@ public record InventoryMutationResult(
     BoosterId boosterId,
     long previousAmount,
     long newAmount,
-    Optional<Long> claimAmount
+    Optional<BoosterClaim> claim
 ) {
 
     public InventoryMutationResult {
@@ -18,17 +19,15 @@ public record InventoryMutationResult(
         if (previousAmount < 0 || newAmount < 0) {
             throw new IllegalArgumentException("inventory amounts cannot be negative");
         }
-        claimAmount = Objects.requireNonNull(claimAmount, "claimAmount");
-        claimAmount.ifPresent(amount -> {
-            if (amount <= 0) {
-                throw new IllegalArgumentException("claimAmount must be positive");
-            }
-        });
-        if (status == InventoryMutationStatus.CLAIM_CREATED && claimAmount.isEmpty()) {
-            throw new IllegalArgumentException("claim-created result requires claimAmount");
+        claim = Objects.requireNonNull(claim, "claim");
+        if (status == InventoryMutationStatus.CLAIM_CREATED && claim.isEmpty()) {
+            throw new IllegalArgumentException("claim-created result requires claim");
         }
-        if (status != InventoryMutationStatus.CLAIM_CREATED && claimAmount.isPresent()) {
-            throw new IllegalArgumentException("only claim-created result can contain claimAmount");
+        if (status != InventoryMutationStatus.CLAIM_CREATED && claim.isPresent()) {
+            throw new IllegalArgumentException("only claim-created result can contain claim");
+        }
+        if (status == InventoryMutationStatus.UNCHANGED && previousAmount != newAmount) {
+            throw new IllegalArgumentException("unchanged result requires equal amounts");
         }
     }
 }

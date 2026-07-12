@@ -15,6 +15,7 @@ public record AuditEntry(
     Optional<Long> amount,
     Optional<String> previousValueJson,
     Optional<String> newValueJson,
+    Optional<UUID> claimId,
     Optional<UUID> activationId,
     Optional<UUID> transferId,
     String sourceType,
@@ -33,6 +34,7 @@ public record AuditEntry(
         amount = Objects.requireNonNull(amount, "amount");
         previousValueJson = normalizeOptional(previousValueJson, "previousValueJson");
         newValueJson = normalizeOptional(newValueJson, "newValueJson");
+        claimId = Objects.requireNonNull(claimId, "claimId");
         activationId = Objects.requireNonNull(activationId, "activationId");
         transferId = Objects.requireNonNull(transferId, "transferId");
         sourceType = requireNotBlank(sourceType, "sourceType");
