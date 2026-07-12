@@ -89,7 +89,7 @@ public final class NetworkBoostersLifecycle implements Listener {
             this.plugin.getServer().getPluginManager().registerEvents(this, this.plugin);
             this.startDatabase();
             this.startRedis(currentGeneration);
-            // this.startZMenu();
+            this.startZMenu();
             this.processAlreadyOnlinePlayers();
 
             this.state.set(LifecycleState.RUNNING);

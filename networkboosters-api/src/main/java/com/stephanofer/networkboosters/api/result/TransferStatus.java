@@ -1,0 +1,15 @@
+package com.stephanofer.networkboosters.api.result;
+
+public enum TransferStatus {
+    TRANSFERRED,
+    SAME_PLAYER,
+    PLAYER_NOT_FOUND,
+    NOT_TRANSFERABLE,
+    INVALID_AMOUNT,
+    INSUFFICIENT_AMOUNT,
+    RECIPIENT_LIMIT_REACHED,
+    COOLDOWN,
+    PERMISSION_DENIED,
+    PLAYER_NOT_READY,
+    SERVICE_UNAVAILABLE
+}

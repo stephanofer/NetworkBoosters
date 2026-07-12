@@ -432,8 +432,8 @@ Consultar principalmente las secciones 25, 28 a 31, 33 y 34 del diseño final.
 
 | Bloque | Estado | Dependencia |
 | --- | --- | --- |
-| 0. Infraestructura base | Pendiente | Ninguna |
-| 1. Contratos y dominio | Pendiente | Bloque 0 |
+| 0. Infraestructura base | Terminado | Ninguna |
+| 1. Contratos y dominio | Terminado | Bloque 0 |
 | 2. Configuración y definiciones | Pendiente | Bloque 1 |
 | 3. Persistencia, revisiones y snapshots | Pendiente | Bloques 1 y 2 |
 | 4. Inventario, capacidad y claims | Pendiente | Bloque 3 |

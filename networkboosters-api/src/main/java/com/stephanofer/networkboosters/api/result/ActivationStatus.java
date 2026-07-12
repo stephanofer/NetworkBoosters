@@ -1,0 +1,19 @@
+package com.stephanofer.networkboosters.api.result;
+
+public enum ActivationStatus {
+    ACTIVATED,
+    EXTENDED,
+    QUEUED,
+    QUEUE_MERGED,
+    REPLACED,
+    NOT_OWNED,
+    DEFINITION_NOT_FOUND,
+    DEFINITION_DISABLED,
+    PERMISSION_DENIED,
+    PRE_ACTIVATION_CANCELLED,
+    GROUP_OCCUPIED,
+    QUEUE_LIMIT_REACHED,
+    DURATION_LIMIT_REACHED,
+    PLAYER_NOT_READY,
+    SERVICE_UNAVAILABLE
+}
