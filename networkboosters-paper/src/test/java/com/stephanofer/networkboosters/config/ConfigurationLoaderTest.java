@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.stephanofer.networkboosters.api.booster.BoosterId;
 import com.stephanofer.networkboosters.config.booster.BoosterDefinitionRegistry;
+import dev.dejvokep.boostedyaml.YamlDocument;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -232,6 +233,39 @@ class ConfigurationLoaderTest {
         ConfigurationException exception = assertThrows(ConfigurationException.class, () -> loader().loadBootstrapCommands());
 
         assertTrue(exception.issues().stream().anyMatch(issue -> issue.path().equals("commands.aliases[0]")));
+    }
+
+    @Test
+    void bootstrapMigrationKeepsConfigVersionIntegerBeforeFullLoad() throws IOException {
+        Files.createDirectories(this.tempDir);
+        Files.writeString(this.tempDir.resolve("config.yml"), this.configContent
+            .replace("config-version: 3", "config-version: 1")
+            .replace("scope-display:\n  games:\n    skywars: SkyWars\n", ""));
+
+        NetworkBoostersConfiguration.Commands commands = loader().loadBootstrapCommands();
+        ConfigurationSnapshot snapshot = loader().load();
+        YamlDocument updated = YamlDocument.create(this.tempDir.resolve("config.yml").toFile());
+
+        assertEquals("boosters", commands.root());
+        assertEquals("skywars", snapshot.configuration().gameId());
+        assertTrue(updated.isInt("config-version"));
+        assertEquals(3, updated.getInt("config-version"));
+        assertEquals("SkyWars", updated.getString("scope-display.games.skywars"));
+    }
+
+    @Test
+    void bootstrapMigrationRepairsStringVersionTwoBeforeFullLoad() throws IOException {
+        Files.createDirectories(this.tempDir);
+        Files.writeString(this.tempDir.resolve("config.yml"), this.configContent.replace("config-version: 3", "config-version: \"2\""));
+
+        NetworkBoostersConfiguration.Commands commands = loader().loadBootstrapCommands();
+        ConfigurationSnapshot snapshot = loader().load();
+        YamlDocument updated = YamlDocument.create(this.tempDir.resolve("config.yml").toFile());
+
+        assertEquals("boosters", commands.root());
+        assertEquals("skywars", snapshot.configuration().gameId());
+        assertTrue(updated.isInt("config-version"));
+        assertEquals(3, updated.getInt("config-version"));
     }
 
     private ConfigurationLoader loader() {

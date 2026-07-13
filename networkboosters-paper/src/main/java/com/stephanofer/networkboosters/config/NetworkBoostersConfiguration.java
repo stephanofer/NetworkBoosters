@@ -68,7 +68,7 @@ public record NetworkBoostersConfiguration(
         Objects.requireNonNull(issues, "issues");
 
         Integer version = requiredInt(config, "config-version", issues);
-        if (version != null && version != 2) {
+        if (version != null && version != 3) {
             error(issues, "config-version", "Unsupported config-version: " + version);
         }
 

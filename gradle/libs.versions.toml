@@ -18,7 +18,7 @@ placeholder-api = { module = "me.clip:placeholderapi", version.ref = "placeholde
 craftkit-database = { module = "com.hera.craftkit:craftkit-database", version.ref = "craftkit" }
 craftkit-redis = { module = "com.hera.craftkit:craftkit-redis", version.ref = "craftkit" }
 craftkit-zmenu = { module = "com.hera.craftkit:craftkit-zmenu", version.ref = "craftkit" }
-boosted-yaml = { module = "dev.dejvokep:boosted-yaml", version.ref = "boosted-yaml" }
+boosted-yaml = { module = "com.stephanofer.boostedyaml:boosted-yaml", version.ref = "boosted-yaml" }
 cloud-paper = { module = "org.incendo:cloud-paper", version.ref = "cloud" }
 cloud-minecraft-extras = { module = "org.incendo:cloud-minecraft-extras", version.ref = "cloud" }
 zmenu-api = { module = "fr.maxlego08.menu:zmenu-api", version.ref = "zmenu-api" }

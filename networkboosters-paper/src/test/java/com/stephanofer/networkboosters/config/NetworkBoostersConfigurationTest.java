@@ -47,7 +47,7 @@ class NetworkBoostersConfigurationTest {
     @Test
     void rejectsUnsupportedVersionAndKeepsAllIssues() throws IOException {
         ConfigurationException exception = assertThrows(ConfigurationException.class, () -> NetworkBoostersConfiguration.load(document("""
-            config-version: 3
+            config-version: 4
             server:
               id: test-01
               game-id: skywars
@@ -120,7 +120,7 @@ class NetworkBoostersConfigurationTest {
     void upgradesVersionOneConfigurationWithScopeDisplay(@TempDir Path tempDir) throws IOException {
         Path file = tempDir.resolve("config.yml");
         Files.writeString(file, validConfig()
-            .replace("config-version: 2", "config-version: 1")
+            .replace("config-version: 3", "config-version: 1")
             .replace("scope-display:\n  games:\n    skywars: SkyWars\n", ""));
         try (var defaults = NetworkBoostersConfigurationTest.class.getClassLoader().getResourceAsStream("config.yml")) {
             YamlDocument updated = YamlDocument.create(
@@ -130,14 +130,33 @@ class NetworkBoostersConfigurationTest {
                 UpdaterSettings.builder().setVersioning(new BasicVersioning("config-version")).build()
             );
 
-            assertEquals(2, updated.getInt("config-version"));
+            assertTrue(updated.isInt("config-version"));
+            assertEquals(3, updated.getInt("config-version"));
             assertEquals("Development", updated.getString("scope-display.games.development"));
+        }
+    }
+
+    @Test
+    void repairsStringVersionTwoConfiguration(@TempDir Path tempDir) throws IOException {
+        Path file = tempDir.resolve("config.yml");
+        Files.writeString(file, validConfig().replace("config-version: 3", "config-version: \"2\""));
+        try (var defaults = NetworkBoostersConfigurationTest.class.getClassLoader().getResourceAsStream("config.yml")) {
+            YamlDocument updated = YamlDocument.create(
+                file.toFile(),
+                defaults,
+                LoaderSettings.builder().setAutoUpdate(true).setAllowDuplicateKeys(false).build(),
+                UpdaterSettings.builder().setVersioning(new BasicVersioning("config-version")).build()
+            );
+
+            assertTrue(updated.isInt("config-version"));
+            assertEquals(3, updated.getInt("config-version"));
+            assertTrue(NetworkBoostersConfiguration.load(updated).placeholderApi().enabled());
         }
     }
 
     static String validConfig() {
         return """
-            config-version: 2
+            config-version: 3
             server:
               id: test-01
               game-id: skywars
