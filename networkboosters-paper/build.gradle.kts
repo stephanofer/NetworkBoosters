@@ -1,4 +1,8 @@
 import java.util.zip.ZipFile
+import org.gradle.api.tasks.Internal
+import org.gradle.process.CommandLineArgumentProvider
+
+val mockitoAgent = configurations.register("mockitoAgent")
 
 plugins {
     java
@@ -21,8 +25,13 @@ dependencies {
     implementation(libs.cloud.minecraft.extras)
 
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.mockito.core)
     testImplementation(libs.paper.api)
     testRuntimeOnly(libs.junit.platform.launcher)
+
+    mockitoAgent(libs.mockito.core) {
+        isTransitive = false
+    }
 }
 
 tasks {
@@ -71,6 +80,14 @@ tasks {
 
     test {
         useJUnitPlatform()
+
+        val mockitoAgentPath = mockitoAgent.map { it.asPath }
+        jvmArgumentProviders.add(object : CommandLineArgumentProvider {
+            @get:Internal
+            val javaAgent = mockitoAgentPath
+
+            override fun asArguments(): Iterable<String> = listOf("-javaagent:${javaAgent.get()}")
+        })
     }
 
     val shadowJarTask = named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar")

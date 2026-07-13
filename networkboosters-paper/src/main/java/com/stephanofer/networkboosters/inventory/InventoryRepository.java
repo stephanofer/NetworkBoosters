@@ -64,11 +64,20 @@ public final class InventoryRepository {
     }
 
     public boolean decrementOne(Connection connection, UUID playerId, BoosterId boosterId) throws SQLException {
+        return this.decrement(connection, playerId, boosterId, 1);
+    }
+
+    public boolean decrement(Connection connection, UUID playerId, BoosterId boosterId, long amount) throws SQLException {
+        if (amount <= 0) {
+            throw new IllegalArgumentException("amount must be positive");
+        }
         try (PreparedStatement statement = connection.prepareStatement(
-            "UPDATE " + this.table + " SET amount = amount - 1 WHERE player_uuid = ? AND booster_id = ? AND amount >= 1"
+            "UPDATE " + this.table + " SET amount = amount - ? WHERE player_uuid = ? AND booster_id = ? AND amount >= ?"
         )) {
-            JdbcUuid.set(statement, 1, playerId);
-            statement.setString(2, boosterId.value());
+            statement.setLong(1, amount);
+            JdbcUuid.set(statement, 2, playerId);
+            statement.setString(3, boosterId.value());
+            statement.setLong(4, amount);
             if (statement.executeUpdate() != 1) {
                 return false;
             }

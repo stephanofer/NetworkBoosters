@@ -252,11 +252,11 @@ Bloque 5 terminado.
 
 ### Objetivo
 
-Implementar transferencias atómicas y seguras entre jugadores online u offline conocidos.
+Implementar transferencias atómicas y seguras entre jugadores conectados en la misma instancia Paper.
 
 ### Alcance organizativo
 
-- integración con la fuente confiable de identidad;
+- validación de que emisor y receptor estén online en la instancia local;
 - políticas y validaciones de transferencia;
 - cooldown;
 - locking determinista por UUID;
@@ -268,6 +268,7 @@ Implementar transferencias atómicas y seguras entre jugadores online u offline 
 ### Condición de cierre
 
 - nunca puede existir débito sin crédito ni crédito sin débito;
+- un receptor offline o conectado en otra instancia provoca rechazo completo;
 - el receptor lleno provoca rechazo completo y no genera claims;
 - las transferencias cruzadas no producen inconsistencias;
 - los deadlocks esperables tienen tratamiento controlado;

@@ -16,9 +16,13 @@ import com.stephanofer.networkboosters.api.booster.BoosterId;
 import com.stephanofer.networkboosters.api.booster.BoosterScope;
 import com.stephanofer.networkboosters.api.booster.BoosterTarget;
 import com.stephanofer.networkboosters.api.booster.ConflictPolicy;
+import com.stephanofer.networkboosters.api.result.TransferStatus;
 import com.stephanofer.networkboosters.api.source.ActivationSource;
 import com.stephanofer.networkboosters.api.source.SourceReference;
+import com.stephanofer.networkboosters.api.source.TransferSource;
+import com.stephanofer.networkboosters.transfer.TransferRepository;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
@@ -75,6 +79,45 @@ class BoosterStorageMySqlIntegrationTest {
         boolean secondResult = second.join();
         assertTrue(firstResult ^ secondResult);
         assertEquals(0, storage.loadSnapshot(playerId).join().ownedAmount(boosterId));
+    }
+
+    @Test
+    void inventoryCanTransferAmountAtomicallyInsideOneTransaction() {
+        UUID senderId = UUID.randomUUID();
+        UUID recipientId = UUID.randomUUID();
+        BoosterId boosterId = BoosterId.of("personal_points_x2");
+
+        storage.write(connection -> {
+            storage.inventory().add(connection, senderId, boosterId, 5);
+            long senderBefore = storage.inventory().amountForUpdate(connection, senderId, boosterId).orElseThrow();
+            long recipientBefore = storage.inventory().amountForUpdate(connection, recipientId, boosterId).orElse(0L);
+
+            assertTrue(storage.inventory().decrement(connection, senderId, boosterId, 3));
+            storage.inventory().add(connection, recipientId, boosterId, 3);
+
+            UUID transferId = UUID.randomUUID();
+            Instant createdAt = Instant.now();
+            storage.transfers().insert(connection, new TransferRepository.StoredTransfer(
+                transferId,
+                senderId,
+                recipientId,
+                boosterId,
+                3,
+                TransferSource.PLAYER_COMMAND,
+                SourceReference.actor(senderId),
+                createdAt,
+                TransferStatus.TRANSFERRED
+            ));
+
+            assertEquals(senderBefore - 3, storage.inventory().amount(connection, senderId, boosterId).orElseThrow());
+            assertEquals(recipientBefore + 3, storage.inventory().amount(connection, recipientId, boosterId).orElseThrow());
+            assertTrue(storage.transfers().latestSuccessfulTransferAt(connection, senderId, boosterId).orElseThrow()
+                .isAfter(createdAt.minus(Duration.ofSeconds(1))));
+            return null;
+        }).join();
+
+        assertEquals(2, storage.loadSnapshot(senderId).join().ownedAmount(boosterId));
+        assertEquals(3, storage.loadSnapshot(recipientId).join().ownedAmount(boosterId));
     }
 
     @Test

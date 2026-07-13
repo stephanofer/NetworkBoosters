@@ -564,7 +564,8 @@ public record BoosterTransferRequest(
     UUID recipientId,
     BoosterId boosterId,
     long amount,
-    TransferSource source
+    TransferSource source,
+    SourceReference sourceReference
 ) {}
 ```
 
@@ -586,7 +587,8 @@ Los boosters promocionales, compensaciones o recompensas vinculadas pueden decla
 La transferencia se rechaza cuando:
 
 - emisor y receptor son el mismo UUID;
-- el jugador destino no existe en la identidad confiable de HERA;
+- el emisor no está online en la instancia Paper que procesa la operación;
+- el receptor no está online en esa misma instancia Paper;
 - el booster no existe o no es transferible;
 - la cantidad es inválida;
 - el emisor no posee suficientes unidades;
@@ -598,23 +600,28 @@ La transferencia se rechaza cuando:
 
 El receptor no necesita permiso de activación para recibir. Puede conservar el booster bloqueado y activarlo cuando obtenga el rango requerido.
 
-### 11.4 Jugadores offline
+### 11.4 Disponibilidad de los participantes
 
-Se admiten receptores offline conocidos. No se usa `Bukkit.getOfflinePlayer(String)` como prueba de existencia porque puede representar nombres que nunca jugaron. La implementación debe integrar la fuente confiable de identidad de HERA.
+Las transferencias requieren que emisor y receptor estén online en la misma instancia Paper que procesa la operación. `Server#getPlayer(UUID)` es la autoridad operativa para esta validación; no se usa `Bukkit.getOfflinePlayer(String)` ni se consulta una identidad central.
+
+Un jugador offline o conectado en otra instancia no puede enviar ni recibir mediante esta operación. La transferencia se rechaza completa antes de abrir la transacción, no genera claims y no modifica inventarios, revisiones, auditoría ni cooldown. Esta restricción elimina la necesidad de resolver identidad y permisos de capacidad offline.
 
 ### 11.5 Transacción
 
 1. Resolver ambos UUID.
-2. Bloquear inventarios en orden determinista por UUID.
-3. Revalidar saldo y capacidad.
-4. Restar al emisor.
-5. Sumar al receptor.
-6. Insertar registro de transferencia.
-7. Insertar auditoría para ambos.
-8. Commit.
-9. Reemplazar snapshots locales.
-10. Publicar invalidaciones Redis.
-11. Emitir eventos y notificaciones.
+2. Verificar que ambos jugadores estén online en la misma instancia Paper.
+3. Resolver el permiso del emisor y la capacidad efectiva del receptor desde sus jugadores locales.
+4. Revalidar inmediatamente disponibilidad, ready state, permiso y capacidad antes de delegar la escritura a MySQL.
+5. Bloquear inventarios en orden determinista por UUID.
+6. Revalidar saldo y capacidad con el uso real persistido.
+7. Restar al emisor.
+8. Sumar al receptor.
+9. Insertar registro de transferencia.
+10. Insertar auditoría para ambos.
+11. Commit.
+12. Reemplazar snapshots locales.
+13. Publicar invalidaciones Redis.
+14. Emitir eventos y notificaciones.
 
 El orden determinista reduce deadlocks cuando dos jugadores se transfieren simultáneamente.
 
@@ -624,16 +631,33 @@ El orden determinista reduce deadlocks cuando dos jugadores se transfieren simul
 public enum TransferStatus {
     TRANSFERRED,
     SAME_PLAYER,
-    PLAYER_NOT_FOUND,
+    RECIPIENT_NOT_ONLINE,
     NOT_TRANSFERABLE,
     INVALID_AMOUNT,
     INSUFFICIENT_AMOUNT,
     RECIPIENT_LIMIT_REACHED,
     COOLDOWN,
     PERMISSION_DENIED,
-    STORAGE_UNAVAILABLE
+    PLAYER_NOT_READY,
+    SERVICE_UNAVAILABLE
 }
 ```
+
+```java
+public record TransferResult(
+    TransferStatus status,
+    UUID senderId,
+    UUID recipientId,
+    BoosterId boosterId,
+    long amount,
+    Optional<UUID> transferId,
+    Optional<Instant> retryAt,
+    OptionalLong senderRemainingAmount,
+    OptionalLong recipientResultingAmount
+) {}
+```
+
+`transferId` existe únicamente para `TRANSFERRED`. `retryAt` existe únicamente para `COOLDOWN`. Los saldos son opcionales porque algunos rechazos ocurren antes de consultar storage; una transferencia exitosa siempre los incluye.
 
 ## 12. API pública
 
@@ -1607,7 +1631,8 @@ Orden recomendado:
 - booster bloqueado por rango;
 - pérdida de permiso después de abrir confirmación;
 - pérdida de rango con inventario excedido;
-- receptor offline o inexistente;
+- emisor o receptor offline;
+- receptor conectado en otra instancia Paper;
 - receptor lleno;
 - grant de sistema sin espacio;
 - claim concurrente;
@@ -1778,6 +1803,7 @@ El sistema está listo cuando:
 - Los boosters pueden requerir permisos de activación.
 - Poseer un booster no garantiza poder activarlo.
 - Las transferencias están incluidas, son configurables, atómicas y auditadas.
+- Las transferencias requieren que ambos jugadores estén online en la misma instancia Paper.
 - La capacidad depende de permisos y cuenta solo inventario sin consumir.
 - No existen límites por booster.
 - Perder rango no elimina boosters.

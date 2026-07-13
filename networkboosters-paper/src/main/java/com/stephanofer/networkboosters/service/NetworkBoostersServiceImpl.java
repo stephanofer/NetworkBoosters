@@ -23,6 +23,7 @@ import com.stephanofer.networkboosters.booster.ActivationMutationService;
 import com.stephanofer.networkboosters.config.ConfigurationStore;
 import com.stephanofer.networkboosters.inventory.InventoryMutationService;
 import com.stephanofer.networkboosters.player.PlayerSnapshotCache;
+import com.stephanofer.networkboosters.transfer.BoosterTransferService;
 import java.time.Clock;
 import java.util.Collection;
 import java.util.Objects;
@@ -37,6 +38,7 @@ public final class NetworkBoostersServiceImpl implements NetworkBoostersService 
     private final BoostCalculator calculator;
     private final ActivationMutationService activationMutations;
     private final InventoryMutationService inventoryMutations;
+    private final BoosterTransferService transfers;
     private final Clock clock;
 
     public NetworkBoostersServiceImpl(
@@ -45,6 +47,7 @@ public final class NetworkBoostersServiceImpl implements NetworkBoostersService 
         BoostCalculator calculator,
         ActivationMutationService activationMutations,
         InventoryMutationService inventoryMutations,
+        BoosterTransferService transfers,
         Clock clock
     ) {
         this.configurationStore = Objects.requireNonNull(configurationStore, "configurationStore");
@@ -52,6 +55,7 @@ public final class NetworkBoostersServiceImpl implements NetworkBoostersService 
         this.calculator = Objects.requireNonNull(calculator, "calculator");
         this.activationMutations = Objects.requireNonNull(activationMutations, "activationMutations");
         this.inventoryMutations = Objects.requireNonNull(inventoryMutations, "inventoryMutations");
+        this.transfers = Objects.requireNonNull(transfers, "transfers");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -122,7 +126,7 @@ public final class NetworkBoostersServiceImpl implements NetworkBoostersService 
 
     @Override
     public CompletableFuture<TransferResult> transfer(BoosterTransferRequest request) {
-        return notImplementedYet("transfer is implemented in block 6");
+        return this.transfers.transfer(request);
     }
 
     @Override
@@ -133,9 +137,5 @@ public final class NetworkBoostersServiceImpl implements NetworkBoostersService 
     @Override
     public CompletableFuture<DeactivationResult> deactivate(DeactivationRequest request) {
         return this.activationMutations.deactivate(request);
-    }
-
-    private static <T> CompletableFuture<T> notImplementedYet(String message) {
-        return CompletableFuture.failedFuture(new UnsupportedOperationException(message));
     }
 }

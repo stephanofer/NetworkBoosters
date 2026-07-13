@@ -8,6 +8,7 @@ boosted-yaml = "1.3.7"
 cloud = "2.0.0-beta.17"
 zmenu-api = "1.1.1.5"
 junit = "6.1.1"
+mockito = "5.20.0"
 
 
 [libraries]
@@ -23,6 +24,7 @@ cloud-minecraft-extras = { module = "org.incendo:cloud-minecraft-extras", versio
 zmenu-api = { module = "fr.maxlego08.menu:zmenu-api", version.ref = "zmenu-api" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 
 [plugins]
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

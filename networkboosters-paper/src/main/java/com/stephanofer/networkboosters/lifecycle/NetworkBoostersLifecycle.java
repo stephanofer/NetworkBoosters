@@ -29,6 +29,7 @@ import com.stephanofer.networkboosters.persistence.BoosterStorage;
 import com.stephanofer.networkboosters.player.PlayerSnapshotCache;
 import com.stephanofer.networkboosters.player.PlayerStateLoader;
 import com.stephanofer.networkboosters.service.NetworkBoostersServiceImpl;
+import com.stephanofer.networkboosters.transfer.BoosterTransferService;
 import com.stephanofer.networkplayersettings.settings.api.PlayerSettingsService;
 import com.stephanofer.networkplayersettings.settings.event.PlayerSettingsReadyEvent;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -68,6 +69,7 @@ public final class NetworkBoostersLifecycle implements Listener {
     private BoosterStorage boosterStorage;
     private PlayerSnapshotCache playerSnapshotCache;
     private ActivationMutationService activationMutationService;
+    private BoosterTransferService transferService;
     private ExpirationCoordinator expirationCoordinator;
     private NetworkBoostersServiceImpl boostersService;
     private RedisClient redis;
@@ -201,6 +203,13 @@ public final class NetworkBoostersLifecycle implements Listener {
             this.configurationStore,
             new PlayerPermissionProvider(this.plugin.getServer(), this.plugin)
         );
+        this.transferService = new BoosterTransferService(
+            this.boosterStorage,
+            this.playerSnapshotCache,
+            this.configurationStore,
+            this.plugin.getServer(),
+            this.plugin
+        );
         stateLoader.initializeReconciler(this.activationMutationService::reconcilePlayerState);
         this.boostersService = new NetworkBoostersServiceImpl(
             this.configurationStore,
@@ -208,6 +217,7 @@ public final class NetworkBoostersLifecycle implements Listener {
             new BoostCalculator(),
             this.activationMutationService,
             new InventoryMutationService(this.boosterStorage, this.playerSnapshotCache, this.configurationStore, this.plugin.getServer()),
+            this.transferService,
             Clock.systemUTC()
         );
         this.plugin.getServer().getServicesManager().register(
@@ -404,6 +414,12 @@ public final class NetworkBoostersLifecycle implements Listener {
             if (this.activationMutationService != null) {
                 this.activationMutationService.close();
                 this.activationMutationService = null;
+            }
+        });
+        closeFailure = close("NetworkBoosters transfer service", closeFailure, () -> {
+            if (this.transferService != null) {
+                this.transferService.close();
+                this.transferService = null;
             }
         });
         closeFailure = close("Player snapshot cache", closeFailure, () -> {

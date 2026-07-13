@@ -29,6 +29,8 @@ import com.stephanofer.networkboosters.api.result.DeactivationResult;
 import com.stephanofer.networkboosters.api.result.DeactivationStatus;
 import com.stephanofer.networkboosters.api.result.InventoryMutationResult;
 import com.stephanofer.networkboosters.api.result.InventoryMutationStatus;
+import com.stephanofer.networkboosters.api.result.TransferResult;
+import com.stephanofer.networkboosters.api.result.TransferStatus;
 import com.stephanofer.networkboosters.api.source.ActivationSource;
 import com.stephanofer.networkboosters.api.source.ClaimSource;
 import com.stephanofer.networkboosters.api.source.SourceReference;
@@ -38,6 +40,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -156,6 +159,27 @@ class DomainContractsTest {
             InventoryMutationStatus.CLAIM_CREATED, BoosterId.of("personal_points_x2"), 0, 0, Optional.empty()));
         assertThrows(IllegalArgumentException.class, () -> new InventoryMutationResult(
             InventoryMutationStatus.UNCHANGED, BoosterId.of("personal_points_x2"), 1, 2, Optional.empty()));
+
+        assertThrows(IllegalArgumentException.class, () -> new TransferResult(
+            TransferStatus.TRANSFERRED,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            BoosterId.of("personal_points_x2"),
+            1,
+            Optional.empty(),
+            Optional.empty(),
+            OptionalLong.of(0),
+            OptionalLong.of(1)));
+        assertThrows(IllegalArgumentException.class, () -> new TransferResult(
+            TransferStatus.COOLDOWN,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            BoosterId.of("personal_points_x2"),
+            1,
+            Optional.empty(),
+            Optional.empty(),
+            OptionalLong.empty(),
+            OptionalLong.empty()));
 
         assertThrows(IllegalArgumentException.class, () -> new DeactivationResult(
             DeactivationStatus.NOT_FOUND, Optional.of(active), Optional.empty()));

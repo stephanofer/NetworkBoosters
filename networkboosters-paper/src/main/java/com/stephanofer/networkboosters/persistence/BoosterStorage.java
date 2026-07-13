@@ -10,6 +10,7 @@ import com.stephanofer.networkboosters.inventory.ClaimRepository;
 import com.stephanofer.networkboosters.inventory.InventoryRepository;
 import com.stephanofer.networkboosters.inventory.MutationReceiptRepository;
 import com.stephanofer.networkboosters.persistence.transaction.BoosterTransactionOptions;
+import com.stephanofer.networkboosters.transfer.TransferRepository;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
@@ -28,6 +29,7 @@ public final class BoosterStorage {
     private final AuditLogRepository auditLog;
     private final InventoryRepository inventory;
     private final ClaimRepository claims;
+    private final TransferRepository transfers;
     private final MutationReceiptRepository mutationReceipts;
     private final Consumer<TransactionRetryEvent> retryListener;
 
@@ -41,6 +43,7 @@ public final class BoosterStorage {
         this.queue = new BoosterQueueRepository(database.table("queue"), mapper, json);
         this.inventory = new InventoryRepository(database.table("inventory"));
         this.claims = new ClaimRepository(database.table("claims"), mapper);
+        this.transfers = new TransferRepository(database.table("transfers"));
         this.mutationReceipts = new MutationReceiptRepository(database.table("mutation_receipts"));
         this.playerStates = new PlayerStateRepository(
             database.table("inventory"),
@@ -98,6 +101,10 @@ public final class BoosterStorage {
 
     public ClaimRepository claims() {
         return this.claims;
+    }
+
+    public TransferRepository transfers() {
+        return this.transfers;
     }
 
     public MutationReceiptRepository mutationReceipts() {

@@ -3,7 +3,7 @@ package com.stephanofer.networkboosters.api.result;
 public enum TransferStatus {
     TRANSFERRED,
     SAME_PLAYER,
-    PLAYER_NOT_FOUND,
+    RECIPIENT_NOT_ONLINE,
     NOT_TRANSFERABLE,
     INVALID_AMOUNT,
     INSUFFICIENT_AMOUNT,
