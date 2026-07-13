@@ -14,6 +14,8 @@ import com.stephanofer.networkboosters.transfer.TransferRepository;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -73,6 +75,11 @@ public final class BoosterStorage {
             throw new IllegalArgumentException("limit must be positive");
         }
         return this.database.query(connection -> this.activations.findExpiredCandidates(connection, limit));
+    }
+
+    public CompletableFuture<Map<UUID, Long>> revisions(Collection<UUID> playerIds) {
+        Objects.requireNonNull(playerIds, "playerIds");
+        return this.database.query(connection -> this.revisions.revisions(connection, playerIds));
     }
 
     public PlayerStateRepository playerStates() {

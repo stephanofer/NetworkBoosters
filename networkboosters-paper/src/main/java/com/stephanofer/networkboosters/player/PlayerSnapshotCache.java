@@ -3,6 +3,7 @@ package com.stephanofer.networkboosters.player;
 import com.stephanofer.networkboosters.api.player.PlayerBoostSnapshot;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -43,18 +44,35 @@ public final class PlayerSnapshotCache implements AutoCloseable {
         return this.snapshots.containsKey(Objects.requireNonNull(playerId, "playerId"));
     }
 
-    public void publish(PlayerBoostSnapshot snapshot) {
+    public Set<UUID> loadedPlayers() {
+        return Set.copyOf(this.snapshots.keySet());
+    }
+
+    public PublishResult publishIfNewer(PlayerBoostSnapshot snapshot) {
         Objects.requireNonNull(snapshot, "snapshot");
         UUID playerId = snapshot.playerId();
+        if (!this.accepting.get()) {
+            return PublishResult.CLOSED;
+        }
+        final boolean[] applied = {false};
         this.snapshots.compute(playerId, (ignored, current) -> {
-            if (!this.accepting.get() || current == null) {
+            if (!this.accepting.get()) {
                 return current;
             }
-            if (current == null || snapshot.revision() > current.revision()) {
+            if (current == null) {
+                return current;
+            }
+            if (snapshot.revision() > current.revision()) {
+                applied[0] = true;
                 return snapshot;
             }
             return current;
         });
+        return applied[0] ? PublishResult.APPLIED : PublishResult.IGNORED;
+    }
+
+    public void publish(PlayerBoostSnapshot snapshot) {
+        this.publishIfNewer(snapshot);
     }
 
     public CompletableFuture<PlayerBoostSnapshot> load(UUID playerId) {
@@ -69,6 +87,27 @@ public final class PlayerSnapshotCache implements AutoCloseable {
     public CompletableFuture<PlayerBoostSnapshot> refresh(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
         return this.loadFromStorage(playerId);
+    }
+
+    /**
+     * Loads the latest durable state without changing this cache.
+     * Synchronization callers must decide whether the result is still current before publishing it.
+     */
+    public CompletableFuture<PlayerBoostSnapshot> refreshUnpublished(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId");
+        if (!this.accepting.get()) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Player snapshot cache is closed"));
+        }
+        long capturedEpoch = this.epoch(playerId);
+        return this.loader.apply(playerId).thenApply(loaded -> {
+            if (!playerId.equals(loaded.playerId())) {
+                throw new IllegalStateException("Loaded snapshot belongs to " + loaded.playerId() + " but expected " + playerId);
+            }
+            if (!this.accepting.get() || this.epoch(playerId) != capturedEpoch) {
+                throw new IllegalStateException("Player snapshot load completed after its lifecycle ended");
+            }
+            return loaded;
+        });
     }
 
     public void unload(UUID playerId) {
@@ -117,5 +156,11 @@ public final class PlayerSnapshotCache implements AutoCloseable {
         this.lifecycleEpochs.clear();
         this.inFlightLoads.clear();
         this.snapshots.clear();
+    }
+
+    public enum PublishResult {
+        APPLIED,
+        IGNORED,
+        CLOSED
     }
 }

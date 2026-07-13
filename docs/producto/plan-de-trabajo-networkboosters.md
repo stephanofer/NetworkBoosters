@@ -437,10 +437,10 @@ Consultar principalmente las secciones 25, 28 a 31, 33 y 34 del diseño final.
 | 1. Contratos y dominio | Terminado | Bloque 0 |
 | 2. Configuración y definiciones | Terminado | Bloque 1 |
 | 3. Persistencia, revisiones y snapshots | Terminado | Bloques 1 y 2 |
-| 4. Inventario, capacidad y claims | Pendiente | Bloque 3 |
-| 5. Activaciones, colas y cálculo | Pendiente | Bloque 4 |
-| 6. Transferencias | Pendiente | Bloque 5 |
-| 7. Eventos y sincronización Redis | Pendiente | Bloques 3 a 6 |
+| 4. Inventario, capacidad y claims | Terminado | Bloque 3 |
+| 5. Activaciones, colas y cálculo | Terminado | Bloque 4 |
+| 6. Transferencias | Terminado | Bloque 5 |
+| 7. Eventos y sincronización Redis | Terminado | Bloques 3 a 6 |
 | 8. Localización e interfaces operativas | Pendiente | Bloque 7 |
 | 9. Menús y experiencia de usuario | Pendiente | Bloque 8 |
 | 10. Integración, endurecimiento y cierre | Pendiente | Bloques 0 a 9 |

@@ -62,6 +62,21 @@ class PlayerSnapshotCacheTest {
     }
 
     @Test
+    void unpublishedRefreshDoesNotMutateTheCache() {
+        UUID playerId = UUID.randomUUID();
+        AtomicReference<CompletableFuture<PlayerBoostSnapshot>> next = new AtomicReference<>();
+        PlayerSnapshotCache cache = new PlayerSnapshotCache(id -> next.get(), () -> {
+        });
+
+        next.set(CompletableFuture.completedFuture(snapshot(playerId, 1)));
+        cache.load(playerId).join();
+        next.set(CompletableFuture.completedFuture(snapshot(playerId, 2)));
+
+        assertEquals(2, cache.refreshUnpublished(playerId).join().revision());
+        assertEquals(1, cache.cached(playerId).orElseThrow().revision());
+    }
+
+    @Test
     void publishReplacesOnlyWithNewerRevisionAndDoesNotReviveUnloadedPlayers() {
         UUID playerId = UUID.randomUUID();
         PlayerSnapshotCache cache = new PlayerSnapshotCache(

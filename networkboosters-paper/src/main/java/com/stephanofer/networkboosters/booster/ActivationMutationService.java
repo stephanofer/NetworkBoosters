@@ -18,9 +18,13 @@ import com.stephanofer.networkboosters.api.source.SourceReference;
 import com.stephanofer.networkboosters.config.ConfigurationSnapshot;
 import com.stephanofer.networkboosters.config.ConfigurationStore;
 import com.stephanofer.networkboosters.config.NetworkBoostersConfiguration;
+import com.stephanofer.networkboosters.event.BoosterEventDispatcher;
 import com.stephanofer.networkboosters.persistence.AuditEntry;
 import com.stephanofer.networkboosters.persistence.BoosterStorage;
 import com.stephanofer.networkboosters.player.PlayerSnapshotCache;
+import com.stephanofer.networkboosters.synchronization.PostCommitChange;
+import com.stephanofer.networkboosters.synchronization.PostCommitMutation;
+import com.stephanofer.networkboosters.synchronization.PostCommitSynchronizer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -42,6 +46,8 @@ public final class ActivationMutationService implements AutoCloseable {
     private final PlayerSnapshotCache snapshots;
     private final ConfigurationStore configurationStore;
     private final PlayerPermissionProvider permissions;
+    private final BoosterEventDispatcher events;
+    private final PostCommitSynchronizer postCommit;
     private final ActivationDecisionEngine decisions;
     private final AtomicBoolean accepting = new AtomicBoolean(true);
 
@@ -49,12 +55,16 @@ public final class ActivationMutationService implements AutoCloseable {
         BoosterStorage storage,
         PlayerSnapshotCache snapshots,
         ConfigurationStore configurationStore,
-        PlayerPermissionProvider permissions
+        PlayerPermissionProvider permissions,
+        BoosterEventDispatcher events,
+        PostCommitSynchronizer postCommit
     ) {
         this.storage = Objects.requireNonNull(storage, "storage");
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
         this.configurationStore = Objects.requireNonNull(configurationStore, "configurationStore");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
+        this.events = Objects.requireNonNull(events, "events");
+        this.postCommit = Objects.requireNonNull(postCommit, "postCommit");
         this.decisions = new ActivationDecisionEngine();
     }
 
@@ -84,16 +94,28 @@ public final class ActivationMutationService implements AutoCloseable {
                     long amount = this.snapshots.getCachedOrEmpty(request.playerId()).ownedAmount(request.boosterId());
                     return CompletableFuture.completedFuture(new MutationOutcome<>(
                         ActivationResult.rejected(ActivationStatus.PERMISSION_DENIED, amount),
-                        Optional.empty()
+                        Optional.empty(),
+                        List.of()
                     ));
                 }
-                return this.storage.write(connection -> this.activate(
-                    connection,
-                    request,
-                    definition,
-                    activationConfig,
-                    true
-                ));
+                return this.events.callPreActivate(request, definition, this.snapshots.getCachedOrEmpty(request.playerId()))
+                    .thenCompose(allowed -> {
+                        if (!allowed) {
+                            long amount = this.snapshots.getCachedOrEmpty(request.playerId()).ownedAmount(request.boosterId());
+                            return CompletableFuture.completedFuture(new MutationOutcome<>(
+                                ActivationResult.rejected(ActivationStatus.PRE_ACTIVATION_CANCELLED, amount),
+                                Optional.empty(),
+                                List.of()
+                            ));
+                        }
+                        return this.storage.write(connection -> this.activate(
+                            connection,
+                            request,
+                            definition,
+                            activationConfig,
+                            true
+                        ));
+                    });
             })
             .thenApply(this::publishActivation)
             .exceptionally(ignored -> ActivationResult.rejected(ActivationStatus.SERVICE_UNAVAILABLE, 0));
@@ -115,9 +137,9 @@ public final class ActivationMutationService implements AutoCloseable {
         }
         return this.storage.findExpiredActivationCandidates(limit)
             .thenCompose(this::expireCandidates)
-            .thenApply(snapshots -> {
-                snapshots.forEach(this.snapshots::publish);
-                return snapshots.size();
+            .thenApply(outcomes -> {
+                outcomes.forEach(outcome -> this.postCommit.publish(new PostCommitMutation<>(null, outcome.changes())));
+                return outcomes.size();
             });
     }
 
@@ -126,7 +148,11 @@ public final class ActivationMutationService implements AutoCloseable {
         if (!this.accepting.get()) {
             return CompletableFuture.failedFuture(new IllegalStateException("Activation mutations are closed"));
         }
-        return this.storage.write(connection -> this.reconcilePlayerState(connection, playerId));
+        return this.storage.write(connection -> this.reconcilePlayerState(connection, playerId))
+            .thenApply(outcome -> {
+                this.postCommit.publish(new PostCommitMutation<>(outcome.result(), outcome.changes()));
+                return outcome.result();
+            });
     }
 
     private MutationOutcome<ActivationResult> activate(
@@ -140,16 +166,16 @@ public final class ActivationMutationService implements AutoCloseable {
         Instant now = currentDatabaseTime(connection);
         Optional<BoosterDefinition> currentDefinition = this.configurationStore.requireCurrent().definitions().find(request.boosterId());
         if (currentDefinition.isEmpty()) {
-            return new MutationOutcome<>(ActivationResult.rejected(ActivationStatus.DEFINITION_NOT_FOUND, 0), Optional.empty());
+            return MutationOutcome.unchanged(ActivationResult.rejected(ActivationStatus.DEFINITION_NOT_FOUND, 0));
         }
         BoosterDefinition current = currentDefinition.orElseThrow();
         if (!current.enabled()) {
             long amount = this.amountForUpdate(connection, request.playerId(), request.boosterId());
-            return new MutationOutcome<>(ActivationResult.rejected(ActivationStatus.DEFINITION_DISABLED, amount), Optional.empty());
+            return MutationOutcome.unchanged(ActivationResult.rejected(ActivationStatus.DEFINITION_DISABLED, amount));
         }
         if (!current.equals(definition)) {
             long amount = this.amountForUpdate(connection, request.playerId(), request.boosterId());
-            return new MutationOutcome<>(ActivationResult.rejected(ActivationStatus.DEFINITION_CHANGED, amount), Optional.empty());
+            return MutationOutcome.unchanged(ActivationResult.rejected(ActivationStatus.DEFINITION_CHANGED, amount));
         }
         long ownedAmount = this.amountForUpdate(connection, request.playerId(), request.boosterId());
         Optional<ActiveBooster> active = this.storage.activations().findActiveForUpdate(
@@ -173,20 +199,38 @@ public final class ActivationMutationService implements AutoCloseable {
         if (!decision.consumesInventory()) {
             Optional<PlayerBoostSnapshot> snapshot = this.finishIfReconciled(connection, request.playerId(), reconciled);
             long remaining = this.storage.inventory().amount(connection, request.playerId(), request.boosterId()).orElse(0L);
-            return new MutationOutcome<>(ActivationResult.rejected(decision.status(), remaining), snapshot);
+            return new MutationOutcome<>(
+                ActivationResult.rejected(decision.status(), remaining),
+                snapshot,
+                snapshot.map(value -> this.timelineChanges(value, reconciled)).orElse(List.of())
+            );
         }
 
         long previous = this.amountForUpdate(connection, request.playerId(), request.boosterId());
         if (previous <= 0 || !this.storage.inventory().decrementOne(connection, request.playerId(), request.boosterId())) {
             Optional<PlayerBoostSnapshot> snapshot = this.finishIfReconciled(connection, request.playerId(), reconciled);
-            return new MutationOutcome<>(ActivationResult.rejected(ActivationStatus.NOT_OWNED, previous), snapshot);
+            return new MutationOutcome<>(
+                ActivationResult.rejected(ActivationStatus.NOT_OWNED, previous),
+                snapshot,
+                snapshot.map(value -> this.timelineChanges(value, reconciled)).orElse(List.of())
+            );
         }
         long remaining = previous - 1;
 
         ActivationMutation mutation = this.applyActivationDecision(connection, request, definition, decision, reconciled, now);
         this.auditInventoryConsumption(connection, request, definition.id(), previous, remaining, mutation.auditTargetId(), decision.status().name());
         PlayerBoostSnapshot snapshot = this.finishMutation(connection, request.playerId());
-        return new MutationOutcome<>(mutation.toResult(decision.status(), remaining), Optional.of(snapshot));
+        ArrayList<PostCommitChange> changes = new ArrayList<>(this.timelineChanges(snapshot, reconciled));
+        changes.add(new PostCommitChange.InventoryChanged(
+            snapshot,
+            definition.id(),
+            previous,
+            remaining,
+            com.stephanofer.networkboosters.api.event.InventoryChangeCause.ACTIVATION_CONSUMPTION,
+            mutation.auditTargetId()
+        ));
+        changes.add(mutation.toChange(snapshot, decision.status()));
+        return new MutationOutcome<>(mutation.toResult(decision.status(), remaining), Optional.of(snapshot), changes);
     }
 
     private MutationOutcome<DeactivationResult> deactivate(Connection connection, DeactivationRequest request) throws SQLException {
@@ -195,20 +239,20 @@ public final class ActivationMutationService implements AutoCloseable {
             request.activationId()
         );
         if (status.isEmpty()) {
-            return new MutationOutcome<>(rejectedDeactivation(DeactivationStatus.NOT_FOUND), Optional.empty());
+            return MutationOutcome.unchanged(rejectedDeactivation(DeactivationStatus.NOT_FOUND));
         }
         UUID playerId = status.orElseThrow().playerId();
         if (!this.snapshots.isReady(playerId)) {
-            return new MutationOutcome<>(rejectedDeactivation(DeactivationStatus.PLAYER_NOT_READY), Optional.empty());
+            return MutationOutcome.unchanged(rejectedDeactivation(DeactivationStatus.PLAYER_NOT_READY));
         }
         if (!"ACTIVE".equals(status.orElseThrow().status())) {
-            return new MutationOutcome<>(rejectedDeactivation(DeactivationStatus.ALREADY_INACTIVE), Optional.empty());
+            return MutationOutcome.unchanged(rejectedDeactivation(DeactivationStatus.ALREADY_INACTIVE));
         }
 
         this.storage.revisions().revisionForUpdate(connection, playerId);
         Optional<ActiveBooster> active = this.storage.activations().findByIdForUpdate(connection, request.activationId());
         if (active.isEmpty()) {
-            return new MutationOutcome<>(rejectedDeactivation(DeactivationStatus.ALREADY_INACTIVE), Optional.empty());
+            return MutationOutcome.unchanged(rejectedDeactivation(DeactivationStatus.ALREADY_INACTIVE));
         }
         ActiveBooster deactivated = active.orElseThrow();
         Instant now = currentDatabaseTime(connection);
@@ -224,6 +268,12 @@ public final class ActivationMutationService implements AutoCloseable {
             );
             promoted = reconciled.currentActive();
             resultStatus = DeactivationStatus.EXPIRED;
+            PlayerBoostSnapshot snapshot = this.finishMutation(connection, playerId);
+            return new MutationOutcome<>(
+                new DeactivationResult(resultStatus, Optional.of(deactivated), promoted),
+                Optional.of(snapshot),
+                this.timelineChanges(snapshot, reconciled)
+            );
         } else {
             this.storage.activations().markDeactivated(connection, deactivated.activationId());
             promoted = this.promoteNextFromNow(connection, queue, now);
@@ -234,25 +284,26 @@ public final class ActivationMutationService implements AutoCloseable {
         PlayerBoostSnapshot snapshot = this.finishMutation(connection, playerId);
         return new MutationOutcome<>(
             new DeactivationResult(resultStatus, Optional.of(deactivated), promoted),
-            Optional.of(snapshot)
+            Optional.of(snapshot),
+            List.of(new PostCommitChange.ActivationDeactivated(snapshot, deactivated, promoted))
         );
     }
 
-    private CompletableFuture<List<PlayerBoostSnapshot>> expireCandidates(
+    private CompletableFuture<List<MutationOutcome<Void>>> expireCandidates(
         List<ActivationRepository.ExpiredActivationCandidate> candidates
     ) {
-        CompletableFuture<List<PlayerBoostSnapshot>> chain = CompletableFuture.completedFuture(new ArrayList<>());
+        CompletableFuture<List<MutationOutcome<Void>>> chain = CompletableFuture.completedFuture(new ArrayList<>());
         for (ActivationRepository.ExpiredActivationCandidate candidate : candidates) {
             chain = chain.thenCompose(snapshots -> this.storage.write(connection -> this.expireCandidate(connection, candidate))
-                .thenApply(snapshot -> {
-                    snapshot.ifPresent(snapshots::add);
+                .thenApply(outcome -> {
+                    outcome.ifPresent(snapshots::add);
                     return snapshots;
                 }));
         }
         return chain.thenApply(List::copyOf);
     }
 
-    private Optional<PlayerBoostSnapshot> expireCandidate(
+    private Optional<MutationOutcome<Void>> expireCandidate(
         Connection connection,
         ActivationRepository.ExpiredActivationCandidate candidate
     ) throws SQLException {
@@ -273,33 +324,49 @@ public final class ActivationMutationService implements AutoCloseable {
             active,
             new QueueTimeline().advance(active, queue, now)
         );
-        return reconciled.changed() ? Optional.of(this.finishMutation(connection, candidate.playerId())) : Optional.empty();
+        if (!reconciled.changed()) {
+            return Optional.empty();
+        }
+        PlayerBoostSnapshot snapshot = this.finishMutation(connection, candidate.playerId());
+        return Optional.of(new MutationOutcome<>(null, Optional.of(snapshot), this.timelineChanges(snapshot, reconciled)));
     }
 
-    private PlayerBoostSnapshot reconcilePlayerState(Connection connection, UUID playerId) throws SQLException {
+    private MutationOutcome<PlayerBoostSnapshot> reconcilePlayerState(Connection connection, UUID playerId) throws SQLException {
         Instant now = currentDatabaseTime(connection);
         List<ActivationRepository.ExpiredActivationCandidate> candidates = this.storage.activations()
             .findExpiredCandidatesForPlayer(connection, playerId, now);
         if (candidates.isEmpty()) {
-            return this.storage.playerStates().loadSnapshot(connection, playerId);
+            return MutationOutcome.unchanged(this.storage.playerStates().loadSnapshot(connection, playerId));
         }
 
         this.storage.revisions().revisionForUpdate(connection, playerId);
         boolean changed = false;
+        ArrayList<TimelineChange> changes = new ArrayList<>();
         for (ActivationRepository.ExpiredActivationCandidate candidate : candidates) {
             Optional<ActiveBooster> active = this.storage.activations().findActiveForUpdate(connection, playerId, candidate.group());
             if (active.isEmpty() || !active.orElseThrow().activationId().equals(candidate.activationId()) || active.orElseThrow().isActiveAt(now)) {
                 continue;
             }
             List<QueuedBooster> queue = this.storage.queue().findGroupForUpdate(connection, playerId, candidate.group());
-            changed |= this.materializeTimeline(
+            ReconciledGroup reconciled = this.materializeTimeline(
                 connection,
                 playerId,
                 active,
                 new QueueTimeline().advance(active, queue, now)
-            ).changed();
+            );
+            changed |= reconciled.changed();
+            changes.addAll(reconciled.changes());
         }
-        return changed ? this.finishMutation(connection, playerId) : this.storage.playerStates().loadSnapshot(connection, playerId);
+        if (!changed) {
+            return MutationOutcome.unchanged(this.storage.playerStates().loadSnapshot(connection, playerId));
+        }
+        PlayerBoostSnapshot snapshot = this.finishMutation(connection, playerId);
+        return new MutationOutcome<>(snapshot, Optional.of(snapshot), this.timelineChanges(snapshot, new ReconciledGroup(
+            Optional.empty(),
+            List.of(),
+            true,
+            changes
+        )));
     }
 
     private ReconciledGroup materializeTimeline(
@@ -310,6 +377,7 @@ public final class ActivationMutationService implements AutoCloseable {
     ) throws SQLException {
         boolean changed = false;
         Optional<ActiveBooster> current = active.filter(booster -> !timeline.activeExpired());
+        ArrayList<TimelineChange> changes = new ArrayList<>();
         if (timeline.activeExpired() && active.isPresent()) {
             ActiveBooster expired = active.orElseThrow();
             this.storage.activations().markExpired(connection, expired.activationId());
@@ -328,12 +396,14 @@ public final class ActivationMutationService implements AutoCloseable {
             );
             changed = true;
             current = Optional.empty();
+            changes.add(TimelineChange.expiredActive(expired));
         }
         ArrayList<UUID> consumedQueueIds = new ArrayList<>();
         for (TimedQueuedBooster expired : timeline.expiredQueuedBoosters()) {
             consumedQueueIds.add(expired.queuedBooster().queueId());
             this.audit(connection, "BOOSTER_QUEUE_EXPIRED", playerId, expired.queuedBooster().boosterId(), 0, Optional.empty(),
                 Optional.of(expired.queuedBooster().queueId()), "SYSTEM", DeactivationReason.EXPIRED.name(), SourceReference.none(), "EXPIRED");
+            changes.add(TimelineChange.expiredQueued(expired.queuedBooster()));
         }
         if (timeline.promotedBooster().isPresent()) {
             TimedQueuedBooster promoted = timeline.promotedBooster().orElseThrow();
@@ -344,12 +414,13 @@ public final class ActivationMutationService implements AutoCloseable {
                 Optional.of(promotedActive.activationId()), Optional.of(promoted.queuedBooster().queueId()), "SYSTEM",
                 ActivationSource.SYSTEM.name(), promoted.queuedBooster().sourceReference(), "PROMOTED");
             current = Optional.of(promotedActive);
+            changes.add(TimelineChange.promoted(promotedActive, promoted.queuedBooster()));
         }
         if (!consumedQueueIds.isEmpty()) {
             this.storage.queue().deleteAll(connection, consumedQueueIds);
             changed = true;
         }
-        return new ReconciledGroup(current, timeline.remainingQueue(), changed);
+        return new ReconciledGroup(current, timeline.remainingQueue(), changed, changes);
     }
 
     private ActivationMutation applyActivationDecision(
@@ -440,13 +511,25 @@ public final class ActivationMutationService implements AutoCloseable {
     }
 
     private ActivationResult publishActivation(MutationOutcome<ActivationResult> outcome) {
-        outcome.snapshot().ifPresent(this.snapshots::publish);
+        this.postCommit.publish(new PostCommitMutation<>(outcome.result(), outcome.changes()));
         return outcome.result();
     }
 
     private DeactivationResult publishDeactivation(MutationOutcome<DeactivationResult> outcome) {
-        outcome.snapshot().ifPresent(this.snapshots::publish);
+        this.postCommit.publish(new PostCommitMutation<>(outcome.result(), outcome.changes()));
         return outcome.result();
+    }
+
+    private List<PostCommitChange> timelineChanges(PlayerBoostSnapshot snapshot, ReconciledGroup reconciled) {
+        ArrayList<PostCommitChange> changes = new ArrayList<>();
+        for (TimelineChange change : reconciled.changes()) {
+            switch (change.kind()) {
+                case EXPIRED_ACTIVE -> changes.add(new PostCommitChange.ActivationExpired(snapshot, change.active(), Optional.empty()));
+                case EXPIRED_QUEUED -> changes.add(new PostCommitChange.ActivationExpired(snapshot, Optional.empty(), change.queued()));
+                case PROMOTED -> changes.add(new PostCommitChange.ActivationStarted(snapshot, change.active().orElseThrow(), change.queued()));
+            }
+        }
+        return List.copyOf(changes);
     }
 
     private long amountForUpdate(Connection connection, UUID playerId, BoosterId boosterId) throws SQLException {
@@ -714,17 +797,22 @@ public final class ActivationMutationService implements AutoCloseable {
         this.accepting.set(false);
     }
 
-    private record MutationOutcome<T>(T result, Optional<PlayerBoostSnapshot> snapshot) {
+    private record MutationOutcome<T>(T result, Optional<PlayerBoostSnapshot> snapshot, List<PostCommitChange> changes) {
         private MutationOutcome {
-            Objects.requireNonNull(result, "result");
             snapshot = Objects.requireNonNull(snapshot, "snapshot");
+            changes = List.copyOf(Objects.requireNonNull(changes, "changes"));
+        }
+
+        private static <T> MutationOutcome<T> unchanged(T result) {
+            return new MutationOutcome<>(result, Optional.empty(), List.of());
         }
     }
 
-    private record ReconciledGroup(Optional<ActiveBooster> currentActive, List<QueuedBooster> queue, boolean changed) {
+    private record ReconciledGroup(Optional<ActiveBooster> currentActive, List<QueuedBooster> queue, boolean changed, List<TimelineChange> changes) {
         private ReconciledGroup {
             currentActive = Objects.requireNonNull(currentActive, "currentActive");
             queue = List.copyOf(Objects.requireNonNull(queue, "queue"));
+            changes = List.copyOf(Objects.requireNonNull(changes, "changes"));
         }
     }
 
@@ -746,8 +834,44 @@ public final class ActivationMutationService implements AutoCloseable {
             return new ActivationResult(status, this.active, this.queued, remainingInventoryAmount);
         }
 
+        private PostCommitChange toChange(PlayerBoostSnapshot snapshot, ActivationStatus status) {
+            return switch (status) {
+                case ACTIVATED, REPLACED -> new PostCommitChange.ActivationStarted(snapshot, this.active.orElseThrow(), Optional.empty());
+                case EXTENDED -> new PostCommitChange.ActivationExtended(snapshot, this.active.orElseThrow());
+                case QUEUED -> new PostCommitChange.BoosterQueued(snapshot, this.queued.orElseThrow(), false);
+                case QUEUE_MERGED -> new PostCommitChange.BoosterQueued(snapshot, this.queued.orElseThrow(), true);
+                default -> throw new IllegalArgumentException("Unsupported successful activation status: " + status);
+            };
+        }
+
         private Optional<UUID> auditTargetId() {
             return this.active.map(ActiveBooster::activationId).or(() -> this.queued.map(QueuedBooster::queueId));
+        }
+    }
+
+    private record TimelineChange(Kind kind, Optional<ActiveBooster> active, Optional<QueuedBooster> queued) {
+        private TimelineChange {
+            Objects.requireNonNull(kind, "kind");
+            active = Objects.requireNonNull(active, "active");
+            queued = Objects.requireNonNull(queued, "queued");
+        }
+
+        private static TimelineChange expiredActive(ActiveBooster active) {
+            return new TimelineChange(Kind.EXPIRED_ACTIVE, Optional.of(active), Optional.empty());
+        }
+
+        private static TimelineChange expiredQueued(QueuedBooster queued) {
+            return new TimelineChange(Kind.EXPIRED_QUEUED, Optional.empty(), Optional.of(queued));
+        }
+
+        private static TimelineChange promoted(ActiveBooster active, QueuedBooster queued) {
+            return new TimelineChange(Kind.PROMOTED, Optional.of(active), Optional.of(queued));
+        }
+
+        private enum Kind {
+            EXPIRED_ACTIVE,
+            EXPIRED_QUEUED,
+            PROMOTED
         }
     }
 }

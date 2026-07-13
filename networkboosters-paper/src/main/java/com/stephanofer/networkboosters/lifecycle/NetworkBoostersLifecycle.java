@@ -24,11 +24,20 @@ import com.stephanofer.networkboosters.config.ConfigurationLoader;
 import com.stephanofer.networkboosters.config.ConfigurationSnapshot;
 import com.stephanofer.networkboosters.config.ConfigurationStore;
 import com.stephanofer.networkboosters.config.NetworkBoostersConfiguration;
+import com.stephanofer.networkboosters.event.BoosterEventDispatcher;
 import com.stephanofer.networkboosters.inventory.InventoryMutationService;
 import com.stephanofer.networkboosters.persistence.BoosterStorage;
 import com.stephanofer.networkboosters.player.PlayerSnapshotCache;
 import com.stephanofer.networkboosters.player.PlayerStateLoader;
 import com.stephanofer.networkboosters.service.NetworkBoostersServiceImpl;
+import com.stephanofer.networkboosters.synchronization.BoosterInvalidationCodec;
+import com.stephanofer.networkboosters.synchronization.BoosterInvalidationPublisher;
+import com.stephanofer.networkboosters.synchronization.BoosterInvalidationSubscriber;
+import com.stephanofer.networkboosters.synchronization.DelegatingPostCommitSynchronizer;
+import com.stephanofer.networkboosters.synchronization.PlayerInvalidationCoordinator;
+import com.stephanofer.networkboosters.synchronization.PlayerRevisionReader;
+import com.stephanofer.networkboosters.synchronization.RedisSynchronizationService;
+import com.stephanofer.networkboosters.synchronization.RevisionReconciliationCoordinator;
 import com.stephanofer.networkboosters.transfer.BoosterTransferService;
 import com.stephanofer.networkplayersettings.settings.api.PlayerSettingsService;
 import com.stephanofer.networkplayersettings.settings.event.PlayerSettingsReadyEvent;
@@ -72,6 +81,11 @@ public final class NetworkBoostersLifecycle implements Listener {
     private BoosterTransferService transferService;
     private ExpirationCoordinator expirationCoordinator;
     private NetworkBoostersServiceImpl boostersService;
+    private BoosterEventDispatcher eventDispatcher;
+    private DelegatingPostCommitSynchronizer postCommitSynchronizer;
+    private PlayerInvalidationCoordinator invalidationCoordinator;
+    private BoosterInvalidationSubscriber invalidationSubscriber;
+    private RevisionReconciliationCoordinator reconciliationCoordinator;
     private RedisClient redis;
     private RedisStatusRegistration redisStatusRegistration;
     private RedisSubscription redisProbeSubscription;
@@ -197,18 +211,23 @@ public final class NetworkBoostersLifecycle implements Listener {
         long started = System.nanoTime();
         PlayerStateLoader stateLoader = new PlayerStateLoader();
         this.playerSnapshotCache = new PlayerSnapshotCache(stateLoader);
+        this.eventDispatcher = new BoosterEventDispatcher(this.plugin, this.logger, this.configuration().serverId());
+        this.postCommitSynchronizer = new DelegatingPostCommitSynchronizer();
         this.activationMutationService = new ActivationMutationService(
             this.boosterStorage,
             this.playerSnapshotCache,
             this.configurationStore,
-            new PlayerPermissionProvider(this.plugin.getServer(), this.plugin)
+            new PlayerPermissionProvider(this.plugin.getServer(), this.plugin),
+            this.eventDispatcher,
+            this.postCommitSynchronizer
         );
         this.transferService = new BoosterTransferService(
             this.boosterStorage,
             this.playerSnapshotCache,
             this.configurationStore,
             this.plugin.getServer(),
-            this.plugin
+            this.plugin,
+            this.postCommitSynchronizer
         );
         stateLoader.initializeReconciler(this.activationMutationService::reconcilePlayerState);
         this.boostersService = new NetworkBoostersServiceImpl(
@@ -216,7 +235,7 @@ public final class NetworkBoostersLifecycle implements Listener {
             this.playerSnapshotCache,
             new BoostCalculator(),
             this.activationMutationService,
-            new InventoryMutationService(this.boosterStorage, this.playerSnapshotCache, this.configurationStore, this.plugin.getServer()),
+            new InventoryMutationService(this.boosterStorage, this.playerSnapshotCache, this.configurationStore, this.plugin.getServer(), this.postCommitSynchronizer),
             this.transferService,
             Clock.systemUTC()
         );
@@ -298,13 +317,57 @@ public final class NetworkBoostersLifecycle implements Listener {
     }
 
     private void startRedis(long currentGeneration) {
+        this.invalidationCoordinator = new PlayerInvalidationCoordinator(this.playerSnapshotCache, this.eventDispatcher, this.logger);
+        this.reconciliationCoordinator = new RevisionReconciliationCoordinator(
+            this.plugin,
+            this.playerSnapshotCache,
+            new PlayerRevisionReader(this.boosterStorage),
+            this.invalidationCoordinator,
+            this.configurationStore,
+            this.logger,
+            this.configuration().serverId()
+        );
         if (!this.configuration().redis().enabled()) {
             this.logger.warn("Redis is disabled in config.yml; cross-server invalidation will be unavailable");
+            this.postCommitSynchronizer.setDelegate(new RedisSynchronizationService(
+                this.playerSnapshotCache,
+                this.eventDispatcher,
+                null,
+                this.configuration().serverId()
+            ));
+            this.reconciliationCoordinator.start();
+            this.reconciliationCoordinator.observe(null);
             return;
         }
         long started = System.nanoTime();
         RedisConfig redisConfig = this.configuration().redis().toRedisConfig(this.configuration().serverId());
         this.redis = RedisClients.lettuce(redisConfig, RedisStartupMode.RECOVER);
+        BoosterInvalidationCodec invalidationCodec = new BoosterInvalidationCodec();
+        String invalidationChannel = this.redis.channel("networkboosters", "player-state-changed");
+        BoosterInvalidationPublisher invalidationPublisher = new BoosterInvalidationPublisher(
+            this.redis,
+            invalidationChannel,
+            this.configuration().serverId(),
+            Clock.systemUTC(),
+            invalidationCodec,
+            this.logger
+        );
+        this.invalidationSubscriber = new BoosterInvalidationSubscriber(
+            this.redis,
+            invalidationChannel,
+            this.configuration().serverId(),
+            invalidationCodec,
+            this.invalidationCoordinator,
+            this.logger
+        );
+        this.postCommitSynchronizer.setDelegate(new RedisSynchronizationService(
+            this.playerSnapshotCache,
+            this.eventDispatcher,
+            invalidationPublisher,
+            this.configuration().serverId()
+        ));
+        this.reconciliationCoordinator.start();
+        this.reconciliationCoordinator.observe(this.redis);
         this.redisStatusRegistration = this.redis.observeOperationalStatus(status -> {
             if (this.generation.get() != currentGeneration || this.state.get() == LifecycleState.STOPPING) {
                 return;
@@ -388,6 +451,9 @@ public final class NetworkBoostersLifecycle implements Listener {
                 Player player = this.plugin.getServer().getPlayer(playerId);
                 if (player != null && player.isOnline()) {
                     this.logger.info("Boosters snapshot ready for {} at revision {}", playerId, snapshot.revision());
+                    if (this.eventDispatcher != null) {
+                        this.eventDispatcher.callReady(player, snapshot);
+                    }
                 }
             });
         });
@@ -408,6 +474,30 @@ public final class NetworkBoostersLifecycle implements Listener {
             if (this.expirationCoordinator != null) {
                 this.expirationCoordinator.close();
                 this.expirationCoordinator = null;
+            }
+        });
+        closeFailure = close("NetworkBoosters reconciliation coordinator", closeFailure, () -> {
+            if (this.reconciliationCoordinator != null) {
+                this.reconciliationCoordinator.close();
+                this.reconciliationCoordinator = null;
+            }
+        });
+        closeFailure = close("NetworkBoosters invalidation subscriber", closeFailure, () -> {
+            if (this.invalidationSubscriber != null) {
+                this.invalidationSubscriber.close();
+                this.invalidationSubscriber = null;
+            }
+        });
+        closeFailure = close("NetworkBoosters invalidation coordinator", closeFailure, () -> {
+            if (this.invalidationCoordinator != null) {
+                this.invalidationCoordinator.close();
+                this.invalidationCoordinator = null;
+            }
+        });
+        closeFailure = close("NetworkBoosters event dispatcher", closeFailure, () -> {
+            if (this.eventDispatcher != null) {
+                this.eventDispatcher.close();
+                this.eventDispatcher = null;
             }
         });
         closeFailure = close("NetworkBoosters activation mutations", closeFailure, () -> {

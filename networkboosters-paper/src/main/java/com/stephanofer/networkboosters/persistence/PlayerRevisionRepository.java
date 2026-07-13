@@ -5,6 +5,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 public final class PlayerRevisionRepository {
@@ -29,6 +32,30 @@ public final class PlayerRevisionRepository {
                 return readRevision(result, "revision", playerId);
             }
         }
+    }
+
+    public Map<UUID, Long> revisions(Connection connection, Collection<UUID> playerIds) throws SQLException {
+        if (playerIds.isEmpty()) {
+            return Map.of();
+        }
+        HashMap<UUID, Long> revisions = new HashMap<>();
+        playerIds.forEach(playerId -> revisions.put(playerId, 0L));
+        String placeholders = String.join(",", java.util.Collections.nCopies(playerIds.size(), "?"));
+        try (PreparedStatement statement = connection.prepareStatement(
+            "SELECT player_uuid, revision FROM " + this.table + " WHERE player_uuid IN (" + placeholders + ")"
+        )) {
+            int index = 1;
+            for (UUID playerId : playerIds) {
+                JdbcUuid.set(statement, index++, playerId);
+            }
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    UUID playerId = JdbcUuid.get(result, "player_uuid");
+                    revisions.put(playerId, readRevision(result, "revision", playerId));
+                }
+            }
+        }
+        return Map.copyOf(revisions);
     }
 
     public long revisionForUpdate(Connection connection, UUID playerId) throws SQLException {

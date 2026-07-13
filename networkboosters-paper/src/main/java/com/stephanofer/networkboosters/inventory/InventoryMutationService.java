@@ -2,6 +2,7 @@ package com.stephanofer.networkboosters.inventory;
 
 import com.stephanofer.networkboosters.api.booster.BoosterDefinition;
 import com.stephanofer.networkboosters.api.booster.BoosterId;
+import com.stephanofer.networkboosters.api.event.InventoryChangeCause;
 import com.stephanofer.networkboosters.api.player.BoosterClaim;
 import com.stephanofer.networkboosters.api.player.ClaimStatus;
 import com.stephanofer.networkboosters.api.player.PlayerBoostSnapshot;
@@ -22,6 +23,10 @@ import com.stephanofer.networkboosters.config.ConfigurationStore;
 import com.stephanofer.networkboosters.persistence.AuditEntry;
 import com.stephanofer.networkboosters.persistence.BoosterStorage;
 import com.stephanofer.networkboosters.player.PlayerSnapshotCache;
+import com.stephanofer.networkboosters.synchronization.PostCommitChange;
+import com.stephanofer.networkboosters.synchronization.PostCommitMutation;
+import com.stephanofer.networkboosters.synchronization.PostCommitSynchronizer;
+import com.stephanofer.networkboosters.synchronization.BoosterChangeType;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -45,17 +50,20 @@ public final class InventoryMutationService {
     private final PlayerCapacityProvider capacityProvider;
     private final InventoryCapacityResolver capacityResolver;
     private final Server server;
+    private final PostCommitSynchronizer postCommit;
 
     public InventoryMutationService(
         BoosterStorage storage,
         PlayerSnapshotCache snapshots,
         ConfigurationStore configurationStore,
-        Server server
+        Server server,
+        PostCommitSynchronizer postCommit
     ) {
         this.storage = Objects.requireNonNull(storage, "storage");
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
         this.configurationStore = Objects.requireNonNull(configurationStore, "configurationStore");
         this.server = Objects.requireNonNull(server, "server");
+        this.postCommit = Objects.requireNonNull(postCommit, "postCommit");
         this.capacityResolver = new InventoryCapacityResolver();
         this.capacityProvider = new PlayerCapacityProvider(server, this.capacityResolver);
     }
@@ -411,13 +419,51 @@ public final class InventoryMutationService {
     }
 
     private InventoryMutationResult publishInventoryResult(MutationOutcome<InventoryMutationResult> outcome) {
-        outcome.snapshot().ifPresent(this.snapshots::publish);
+        outcome.snapshot().ifPresent(snapshot -> {
+            InventoryMutationResult result = outcome.result();
+            PostCommitChange change = result.status() == InventoryMutationStatus.CLAIM_CREATED
+                ? new PostCommitChange.StateChanged(snapshot, BoosterChangeType.INVENTORY_CHANGED, result.claim().map(BoosterClaim::claimId))
+                : new PostCommitChange.InventoryChanged(
+                    snapshot,
+                    result.boosterId(),
+                    result.previousAmount(),
+                    result.newAmount(),
+                    cause(result.status()),
+                    Optional.empty()
+                );
+            this.postCommit.publish(new PostCommitMutation<>(result, java.util.List.of(change)));
+        });
         return outcome.result();
     }
 
     private ClaimResult publishClaimResult(MutationOutcome<ClaimResult> outcome) {
-        outcome.snapshot().ifPresent(this.snapshots::publish);
+        outcome.snapshot().ifPresent(snapshot -> {
+            ClaimResult result = outcome.result();
+            result.claim().ifPresent(claim -> this.postCommit.publish(new PostCommitMutation<>(
+                result,
+                java.util.List.of(
+                    new PostCommitChange.InventoryChanged(
+                        snapshot,
+                        claim.boosterId(),
+                        result.inventoryAmount() - claim.amount(),
+                        result.inventoryAmount(),
+                        InventoryChangeCause.CLAIM,
+                        Optional.of(claim.claimId())
+                    ),
+                    new PostCommitChange.ClaimCompleted(snapshot, claim, result.inventoryAmount())
+                )
+            )));
+        });
         return outcome.result();
+    }
+
+    private static InventoryChangeCause cause(InventoryMutationStatus status) {
+        return switch (status) {
+            case GRANTED, GRANTED_FORCED -> InventoryChangeCause.GRANT;
+            case REVOKED -> InventoryChangeCause.REVOKE;
+            case SET -> InventoryChangeCause.SET;
+            default -> InventoryChangeCause.GRANT;
+        };
     }
 
     private Optional<BoosterDefinition> definition(BoosterId boosterId) {

@@ -28,6 +28,7 @@ import com.stephanofer.networkboosters.config.NetworkBoostersConfiguration;
 import com.stephanofer.networkboosters.config.booster.BoosterDefinitionRegistry;
 import com.stephanofer.networkboosters.persistence.BoosterStorage;
 import com.stephanofer.networkboosters.player.PlayerSnapshotCache;
+import com.stephanofer.networkboosters.synchronization.PostCommitSynchronizer;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -79,7 +80,7 @@ class BoosterTransferServiceTest {
         when(snapshots.isReady(senderId)).thenReturn(true);
         when(snapshots.isReady(recipientId)).thenReturn(true);
 
-        BoosterTransferService service = new BoosterTransferService(storage, snapshots, configurationStore, server, plugin);
+        BoosterTransferService service = new BoosterTransferService(storage, snapshots, configurationStore, server, plugin, PostCommitSynchronizer.noop());
         try (MockedStatic<Bukkit> bukkit = org.mockito.Mockito.mockStatic(Bukkit.class)) {
             bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);
 
@@ -109,7 +110,7 @@ class BoosterTransferServiceTest {
         when(snapshots.isReady(senderId)).thenReturn(true);
         when(snapshots.isReady(recipientId)).thenReturn(true);
 
-        BoosterTransferService service = new BoosterTransferService(storage, snapshots, configurationStore, server, plugin);
+        BoosterTransferService service = new BoosterTransferService(storage, snapshots, configurationStore, server, plugin, PostCommitSynchronizer.noop());
         when(storage.write(any())).thenAnswer(invocation -> {
             service.close();
             BoosterStorage.TransactionalOperation<?> operation = invocation.getArgument(0);

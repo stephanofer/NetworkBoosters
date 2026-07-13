@@ -15,6 +15,9 @@ import com.stephanofer.networkboosters.config.ConfigurationStore;
 import com.stephanofer.networkboosters.persistence.AuditEntry;
 import com.stephanofer.networkboosters.persistence.BoosterStorage;
 import com.stephanofer.networkboosters.player.PlayerSnapshotCache;
+import com.stephanofer.networkboosters.synchronization.PostCommitChange;
+import com.stephanofer.networkboosters.synchronization.PostCommitMutation;
+import com.stephanofer.networkboosters.synchronization.PostCommitSynchronizer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -39,6 +42,7 @@ public final class BoosterTransferService implements AutoCloseable {
     private final ConfigurationStore configurationStore;
     private final Server server;
     private final Plugin plugin;
+    private final PostCommitSynchronizer postCommit;
     private final InventoryCapacityResolver capacityResolver = new InventoryCapacityResolver();
     private final AtomicBoolean accepting = new AtomicBoolean(true);
 
@@ -47,13 +51,15 @@ public final class BoosterTransferService implements AutoCloseable {
         PlayerSnapshotCache snapshots,
         ConfigurationStore configurationStore,
         Server server,
-        Plugin plugin
+        Plugin plugin,
+        PostCommitSynchronizer postCommit
     ) {
         this.storage = Objects.requireNonNull(storage, "storage");
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
         this.configurationStore = Objects.requireNonNull(configurationStore, "configurationStore");
         this.server = Objects.requireNonNull(server, "server");
         this.plugin = Objects.requireNonNull(plugin, "plugin");
+        this.postCommit = Objects.requireNonNull(postCommit, "postCommit");
     }
 
     public CompletableFuture<TransferResult> transfer(BoosterTransferRequest request) {
@@ -271,8 +277,13 @@ public final class BoosterTransferService implements AutoCloseable {
     }
 
     private TransferResult publishTransfer(MutationOutcome outcome) {
-        outcome.senderSnapshot().ifPresent(this.snapshots::publish);
-        outcome.recipientSnapshot().ifPresent(this.snapshots::publish);
+        if (outcome.senderSnapshot().isPresent() && outcome.recipientSnapshot().isPresent()) {
+            this.postCommit.publish(new PostCommitMutation<>(outcome.result(), java.util.List.of(new PostCommitChange.TransferCompleted(
+                outcome.result(),
+                outcome.senderSnapshot().orElseThrow(),
+                outcome.recipientSnapshot().orElseThrow()
+            ))));
+        }
         return outcome.result();
     }
 
