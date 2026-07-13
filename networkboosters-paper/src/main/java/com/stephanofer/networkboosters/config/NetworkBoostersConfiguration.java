@@ -30,6 +30,7 @@ public record NetworkBoostersConfiguration(
     Limits limits,
     Activation activation,
     InventoryLimits inventoryLimits,
+    Localization localization,
     Commands commands,
     PlaceholderApi placeholderApi
 ) {
@@ -46,6 +47,7 @@ public record NetworkBoostersConfiguration(
         Objects.requireNonNull(limits, "limits");
         Objects.requireNonNull(activation, "activation");
         Objects.requireNonNull(inventoryLimits, "inventoryLimits");
+        Objects.requireNonNull(localization, "localization");
         Objects.requireNonNull(commands, "commands");
         Objects.requireNonNull(placeholderApi, "placeholderApi");
     }
@@ -75,6 +77,7 @@ public record NetworkBoostersConfiguration(
         Section limits = requiredSection(config, "limits", issues);
         Section activation = requiredSection(config, "activation", issues);
         Section inventoryLimits = requiredSection(config, "inventory-limits", issues);
+        Section localization = requiredSection(config, "localization", issues);
         Section commands = requiredSection(config, "commands", issues);
         Section placeholderApi = requiredSection(config, "placeholderapi", issues);
 
@@ -86,6 +89,7 @@ public record NetworkBoostersConfiguration(
         Limits limitsConfig = parseLimits(limits, issues);
         Activation activationConfig = parseActivation(activation, issues);
         InventoryLimits inventoryLimitsConfig = parseInventoryLimits(inventoryLimits, issues);
+        Localization localizationConfig = parseLocalization(localization, issues);
         Commands commandsConfig = parseCommands(commands, issues);
         PlaceholderApi placeholderApiConfig = parsePlaceholderApi(placeholderApi, issues);
 
@@ -101,6 +105,7 @@ public record NetworkBoostersConfiguration(
             limitsConfig,
             activationConfig,
             inventoryLimitsConfig,
+            localizationConfig,
             commandsConfig,
             placeholderApiConfig
         );
@@ -278,6 +283,14 @@ public record NetworkBoostersConfiguration(
                 throw new IllegalArgumentException("fallback cannot be negative");
             }
             tiers = List.copyOf(Objects.requireNonNull(tiers, "tiers"));
+        }
+    }
+
+    public record Localization(String fallbackLanguage, String consoleLanguage) {
+
+        public Localization {
+            fallbackLanguage = normalizeLanguage(fallbackLanguage, "fallbackLanguage");
+            consoleLanguage = normalizeLanguage(consoleLanguage, "consoleLanguage");
         }
     }
 
@@ -533,6 +546,18 @@ public record NetworkBoostersConfiguration(
         return issues.size() > issueCount || root == null ? null : new Commands(root, aliases);
     }
 
+    private static Localization parseLocalization(Section localization, List<ConfigurationIssue> issues) {
+        if (localization == null) {
+            return null;
+        }
+        int issueCount = issues.size();
+        String fallback = requiredString(localization, "fallback-language", "localization.fallback-language", issues);
+        String console = requiredString(localization, "console-language", "localization.console-language", issues);
+        fallback = normalizeLanguageOrIssue(fallback, "localization.fallback-language", issues);
+        console = normalizeLanguageOrIssue(console, "localization.console-language", issues);
+        return issues.size() > issueCount || fallback == null || console == null ? null : new Localization(fallback, console);
+    }
+
     private static PlaceholderApi parsePlaceholderApi(Section placeholderApi, List<ConfigurationIssue> issues) {
         if (placeholderApi == null) {
             return null;
@@ -746,6 +771,26 @@ public record NetworkBoostersConfiguration(
         String value = requireNotBlank(raw, label).toLowerCase(Locale.ROOT);
         if (!pattern.matcher(value).matches()) {
             throw new IllegalArgumentException("Invalid " + label + ": " + raw);
+        }
+        return value;
+    }
+
+    private static String normalizeLanguage(String raw, String label) {
+        String value = requireNotBlank(raw, label).toLowerCase(Locale.ROOT);
+        if (!value.equals("es") && !value.equals("en")) {
+            throw new IllegalArgumentException(label + " must be es or en");
+        }
+        return value;
+    }
+
+    private static String normalizeLanguageOrIssue(String raw, String path, List<ConfigurationIssue> issues) {
+        if (raw == null) {
+            return null;
+        }
+        String value = raw.toLowerCase(Locale.ROOT);
+        if (!value.equals("es") && !value.equals("en")) {
+            error(issues, path, "Must be es or en");
+            return null;
         }
         return value;
     }

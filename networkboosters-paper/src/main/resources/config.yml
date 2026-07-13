@@ -62,6 +62,10 @@ inventory-limits:
       maximum: 100
       priority: 200
 
+localization:
+  fallback-language: en
+  console-language: en
+
 commands:
   root: boosters
   aliases:

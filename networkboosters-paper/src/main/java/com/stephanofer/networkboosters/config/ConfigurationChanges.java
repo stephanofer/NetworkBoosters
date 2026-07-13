@@ -35,6 +35,9 @@ public record ConfigurationChanges(List<String> restartRequiredPaths) {
         if (!previous.commands().equals(candidate.commands())) {
             restartRequiredPaths.add("commands");
         }
+        if (previous.placeholderApi().enabled() != candidate.placeholderApi().enabled()) {
+            restartRequiredPaths.add("placeholderapi.enabled");
+        }
         return new ConfigurationChanges(restartRequiredPaths);
     }
 

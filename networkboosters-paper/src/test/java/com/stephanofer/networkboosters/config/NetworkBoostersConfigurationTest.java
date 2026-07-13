@@ -69,6 +69,9 @@ class NetworkBoostersConfigurationTest {
                 - 7d
             inventory-limits:
               fallback: -1
+            localization:
+              fallback-language: en
+              console-language: en
             commands:
               root: boosters
               aliases:
@@ -166,6 +169,9 @@ class NetworkBoostersConfigurationTest {
                   permission: networkboosters.capacity.legend
                   maximum: 100
                   priority: 200
+            localization:
+              fallback-language: en
+              console-language: en
             commands:
               root: boosters
               aliases:

@@ -20,10 +20,16 @@ import com.stephanofer.networkboosters.booster.ActivationMutationService;
 import com.stephanofer.networkboosters.booster.ExpirationCoordinator;
 import com.stephanofer.networkboosters.booster.PlayerPermissionProvider;
 import com.stephanofer.networkboosters.calculation.BoostCalculator;
+import com.stephanofer.networkboosters.capacity.InventoryCapacityResolver;
+import com.stephanofer.networkboosters.capacity.ResolvedInventoryCapacity;
+import com.stephanofer.networkboosters.command.NetworkBoostersCommandBridge;
+import com.stephanofer.networkboosters.command.NetworkBoostersCommandRuntime;
 import com.stephanofer.networkboosters.config.ConfigurationLoader;
 import com.stephanofer.networkboosters.config.ConfigurationSnapshot;
 import com.stephanofer.networkboosters.config.ConfigurationStore;
 import com.stephanofer.networkboosters.config.NetworkBoostersConfiguration;
+import com.stephanofer.networkboosters.localization.LocalizationService;
+import com.stephanofer.networkboosters.placeholder.NetworkBoostersPlaceholderExpansion;
 import com.stephanofer.networkboosters.event.BoosterEventDispatcher;
 import com.stephanofer.networkboosters.inventory.InventoryMutationService;
 import com.stephanofer.networkboosters.persistence.BoosterStorage;
@@ -48,9 +54,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 import org.bukkit.entity.Player;
@@ -61,7 +70,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.ServicePriority;
 import org.incendo.cloud.paper.PaperCommandManager;
 
-public final class NetworkBoostersLifecycle implements Listener {
+public final class NetworkBoostersLifecycle implements Listener, NetworkBoostersCommandRuntime {
 
     private static final String METADATA_TABLE = "metadata";
     private static final String PROBE_KEY_PREFIX = "__infrastructure_probe_";
@@ -69,11 +78,15 @@ public final class NetworkBoostersLifecycle implements Listener {
     private final NetworkBoostersPlugin plugin;
     private final ComponentLogger logger;
     private final PaperCommandManager.Bootstrapped<CommandSourceStack> commandManager;
+    private final NetworkBoostersCommandBridge commandBridge;
     private final AtomicReference<LifecycleState> state = new AtomicReference<>(LifecycleState.NEW);
+    private final AtomicBoolean reloadInProgress = new AtomicBoolean();
     private final AtomicLong generation = new AtomicLong();
     private final ConfigurationStore configurationStore = new ConfigurationStore();
+    private final Clock clock = Clock.systemUTC();
 
     private PlayerSettingsService playerSettings;
+    private LocalizationService localizationService;
     private Database database;
     private BoosterStorage boosterStorage;
     private PlayerSnapshotCache playerSnapshotCache;
@@ -86,6 +99,7 @@ public final class NetworkBoostersLifecycle implements Listener {
     private PlayerInvalidationCoordinator invalidationCoordinator;
     private BoosterInvalidationSubscriber invalidationSubscriber;
     private RevisionReconciliationCoordinator reconciliationCoordinator;
+    private NetworkBoostersPlaceholderExpansion placeholderExpansion;
     private RedisClient redis;
     private RedisStatusRegistration redisStatusRegistration;
     private RedisSubscription redisProbeSubscription;
@@ -93,11 +107,13 @@ public final class NetworkBoostersLifecycle implements Listener {
 
     public NetworkBoostersLifecycle(
         NetworkBoostersPlugin plugin,
-        PaperCommandManager.Bootstrapped<CommandSourceStack> commandManager
+        PaperCommandManager.Bootstrapped<CommandSourceStack> commandManager,
+        NetworkBoostersCommandBridge commandBridge
     ) {
         this.plugin = plugin;
         this.logger = plugin.getComponentLogger();
         this.commandManager = commandManager;
+        this.commandBridge = commandBridge;
     }
 
     public LifecycleState state() {
@@ -117,13 +133,16 @@ public final class NetworkBoostersLifecycle implements Listener {
             this.commandManager.onEnable();
             this.loadConfiguration();
             this.playerSettings = this.resolvePlayerSettings();
+            this.localizationService = new LocalizationService(this.configurationStore, this.playerSettings);
             this.plugin.getServer().getPluginManager().registerEvents(this, this.plugin);
             this.startDatabase();
             this.startPlayerState();
             this.startRedis(currentGeneration);
             this.startZMenu();
+            this.startPlaceholderApi();
             this.processAlreadyOnlinePlayers();
 
+            this.commandBridge.bind(this);
             this.state.set(LifecycleState.RUNNING);
             this.logger.info("NetworkBoosters enabled in {} ms", elapsedMillis(started));
         } catch (Throwable throwable) {
@@ -179,6 +198,122 @@ public final class NetworkBoostersLifecycle implements Listener {
         if (!snapshot.definitionChanges().added().isEmpty()) {
             this.logger.info("Loaded new booster definitions: {}", snapshot.definitionChanges().added());
         }
+    }
+
+    @Override
+    public NetworkBoostersPlugin plugin() {
+        return this.plugin;
+    }
+
+    @Override
+    public org.bukkit.Server server() {
+        return this.plugin.getServer();
+    }
+
+    @Override
+    public NetworkBoostersService service() {
+        return this.boostersService;
+    }
+
+    @Override
+    public ConfigurationStore configurationStore() {
+        return this.configurationStore;
+    }
+
+    @Override
+    public LocalizationService localization() {
+        return this.localizationService;
+    }
+
+    @Override
+    public PlayerSettingsService playerSettings() {
+        return this.playerSettings;
+    }
+
+    @Override
+    public Clock clock() {
+        return this.clock;
+    }
+
+    @Override
+    public ResolvedInventoryCapacity capacity(Player player) {
+        return new InventoryCapacityResolver().resolve(
+            this.configuration().inventoryLimits().fallback(),
+            this.configuration().inventoryLimits().tiers(),
+            player::hasPermission
+        );
+    }
+
+    @Override
+    public CompletableFuture<Long> persistedRevision(UUID playerId) {
+        BoosterStorage storage = this.boosterStorage;
+        if (storage == null) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Storage is not available"));
+        }
+        return storage.revisions(List.of(playerId)).thenApply(revisions -> revisions.getOrDefault(playerId, 0L));
+    }
+
+    @Override
+    public CompletableFuture<ReloadReport> reload() {
+        if (this.state.get() != LifecycleState.RUNNING) {
+            return CompletableFuture.completedFuture(new ReloadReport(false, false, "Lifecycle is not running", 0, 0));
+        }
+        if (!this.reloadInProgress.compareAndSet(false, true)) {
+            return CompletableFuture.completedFuture(new ReloadReport(false, false, "A reload is already in progress", 0, 0));
+        }
+        return CompletableFuture.supplyAsync(this::reloadNow)
+            .whenComplete((ignored, failure) -> this.reloadInProgress.set(false));
+    }
+
+    private ReloadReport reloadNow() {
+        try {
+            ConfigurationLoader loader = new ConfigurationLoader(this.plugin.getDataFolder(), this.plugin::getResource);
+            ConfigurationSnapshot candidate = loader.load(this.configurationStore.requireCurrent());
+            if (this.state.get() != LifecycleState.RUNNING) {
+                return new ReloadReport(false, false, "Lifecycle stopped during reload", 0, 0);
+            }
+            if (candidate.configurationChanges().requiresRestart()) {
+                return new ReloadReport(
+                    false,
+                    true,
+                    String.join(", ", candidate.configurationChanges().restartRequiredPaths()),
+                    candidate.definitions().size(),
+                    candidate.warnings().size()
+                );
+            }
+            ConfigurationSnapshot published = this.configurationStore.replace(candidate);
+            published.warnings().forEach(issue -> this.logger.warn("{}:{} - {}", issue.file(), issue.path(), issue.message()));
+            this.logger.info(
+                "NetworkBoosters reloaded with {} booster definition(s) and {} warning(s)",
+                published.definitions().size(),
+                published.warnings().size()
+            );
+            return new ReloadReport(true, false, "", published.definitions().size(), published.warnings().size());
+        } catch (IllegalArgumentException exception) {
+            return new ReloadReport(false, true, exception.getMessage(), 0, 0);
+        } catch (Throwable throwable) {
+            this.logger.warn("NetworkBoosters reload failed; previous configuration remains active", throwable);
+            return new ReloadReport(false, false, throwable.getMessage(), 0, 0);
+        }
+    }
+
+    @Override
+    public String redisStatus() {
+        if (!this.configuration().redis().enabled()) {
+            return "disabled";
+        }
+        if (this.redis == null) {
+            return "unavailable";
+        }
+        return this.redis.operationalStatus().state().name().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    @Override
+    public boolean isRunning() {
+        return this.state.get() == LifecycleState.RUNNING
+            && this.boostersService != null
+            && this.localizationService != null
+            && this.playerSettings != null;
     }
 
     private PlayerSettingsService resolvePlayerSettings() {
@@ -237,7 +372,7 @@ public final class NetworkBoostersLifecycle implements Listener {
             this.activationMutationService,
             new InventoryMutationService(this.boosterStorage, this.playerSnapshotCache, this.configurationStore, this.plugin.getServer(), this.postCommitSynchronizer),
             this.transferService,
-            Clock.systemUTC()
+            this.clock
         );
         this.plugin.getServer().getServicesManager().register(
             NetworkBoostersService.class,
@@ -421,6 +556,24 @@ public final class NetworkBoostersLifecycle implements Listener {
         this.logger.info("zMenu integration loaded and reload verified in {} ms", elapsedMillis(started));
     }
 
+    private void startPlaceholderApi() {
+        if (!this.configuration().placeholderApi().enabled()) {
+            this.logger.info("PlaceholderAPI integration is disabled in config.yml");
+            return;
+        }
+        if (!this.plugin.getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            this.logger.info("PlaceholderAPI is not installed or not enabled; skipping NetworkBoosters expansion");
+            return;
+        }
+        this.placeholderExpansion = new NetworkBoostersPlaceholderExpansion(this);
+        if (this.placeholderExpansion.register()) {
+            this.logger.info("PlaceholderAPI expansion registered");
+        } else {
+            this.logger.warn("PlaceholderAPI expansion registration returned false");
+            this.placeholderExpansion = null;
+        }
+    }
+
     private void processAlreadyOnlinePlayers() {
         long currentGeneration = this.generation.get();
         for (Player player : this.plugin.getServer().getOnlinePlayers()) {
@@ -465,6 +618,11 @@ public final class NetworkBoostersLifecycle implements Listener {
 
         RuntimeException closeFailure = null;
         closeFailure = close("NetworkBoosters service", closeFailure, () -> {
+            this.commandBridge.clear(this);
+            if (this.placeholderExpansion != null) {
+                this.placeholderExpansion.unregister();
+                this.placeholderExpansion = null;
+            }
             if (this.boostersService != null) {
                 this.plugin.getServer().getServicesManager().unregister(NetworkBoostersService.class, this.boostersService);
                 this.boostersService = null;
@@ -545,6 +703,7 @@ public final class NetworkBoostersLifecycle implements Listener {
 
         this.boosterStorage = null;
         this.zmenu = null;
+        this.localizationService = null;
         this.playerSettings = null;
         this.configurationStore.clear();
 

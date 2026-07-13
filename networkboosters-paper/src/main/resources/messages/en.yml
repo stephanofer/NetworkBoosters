@@ -1,0 +1,150 @@
+config-version: 1
+
+common:
+  prefix: "<dark_gray>[<aqua>Boosters</aqua><dark_gray>]"
+  loading: "<gray>Processing..."
+  service-unavailable: "<red>NetworkBoosters is not available right now. Try again later."
+  player-not-ready: "<yellow>Your boosters are still loading. Try again in a moment."
+  player-only: "<red>This command can only be used by a player."
+  no-permission: "<red>You do not have permission to use this command."
+  invalid-syntax: "<red>Invalid command syntax. Use <white>/<command> help</white>."
+  invalid-amount: "<red>Invalid amount. Use a positive whole number."
+  invalid-uuid: "<red>Invalid UUID."
+  unknown-player: "<red>That player is not online in this server."
+  unknown-booster: "<red>Unknown booster: <booster>."
+  page-out-of-range: "<yellow>That page does not exist."
+
+help:
+  header: "<aqua>NetworkBoosters commands"
+  entry: "<gray>/<command> <dark_gray>- <description>"
+  footer: "<dark_gray>Use commands to manage boosters while menus are unavailable."
+  summary: "view your booster summary"
+  list: "list your boosters"
+  active: "view active boosters"
+  queue: "view queued boosters"
+  claims: "view and claim pending rewards"
+  activate: "activate a booster"
+  transfer: "transfer boosters"
+
+summary:
+  header: "<aqua>Network Boosters"
+  inventory: "<gray>Inventory: <white><used></white>/<white><capacity></white>"
+  active: "<gray>Active: <white><amount></white>"
+  queued: "<gray>Queued: <white><amount></white>"
+  claims: "<gray>Pending rewards: <white><amount></white>"
+  hint: "<dark_gray>Use <gray>/boosters list</gray> to view your boosters."
+
+list:
+  header: "<aqua>Your boosters <dark_gray>(page <page>/<pages>)"
+  entry: "<gray>- <name> <dark_gray>(<id>)</dark_gray> <white>x<amount></white> <dark_gray>|</dark_gray> <aqua>x<multiplier></aqua> <dark_gray>|</dark_gray> <gray><duration>"
+  empty: "<yellow>You do not own any boosters."
+
+active:
+  header: "<aqua>Active boosters"
+  entry: "<gray>- <name> <dark_gray>(<group>)</dark_gray> <aqua>x<multiplier></aqua> <gray>remaining <white><remaining></white>"
+  empty: "<yellow>You do not have active boosters."
+
+queue:
+  header: "<aqua>Booster queue"
+  entry: "<gray>- #<position> <name> <dark_gray>(<group>)</dark_gray> <gray>duration <white><duration></white>"
+  empty: "<yellow>Your booster queue is empty."
+
+claims:
+  header: "<aqua>Pending booster rewards"
+  entry: "<gray>- <claim> <dark_gray>|</dark_gray> <name> <white>x<amount></white>"
+  empty: "<yellow>You do not have pending booster rewards."
+  claimed: "<green>Claimed <name> x<amount>."
+  claim-all-summary: "<green>Claimed <claimed> reward(s). <yellow><failed> failed."
+  not-found: "<red>That claim does not exist."
+  already-claimed: "<yellow>That claim was already claimed."
+  inventory-full: "<red>Your inventory does not have enough space for that claim."
+
+activation:
+  activated: "<green>Activated <name>. Remaining inventory: <amount>."
+  extended: "<green>Extended <name>. Remaining inventory: <amount>."
+  queued: "<green>Queued <name>. Remaining inventory: <amount>."
+  queue-merged: "<green>Merged <name> into your queue. Remaining inventory: <amount>."
+  replaced: "<green>Replaced your active booster with <name>. Remaining inventory: <amount>."
+  not-owned: "<red>You do not own that booster."
+  definition-not-found: "<red>That booster no longer exists."
+  definition-changed: "<red>That booster changed. Reopen the interface or retry the command."
+  definition-disabled: "<red>That booster is disabled."
+  permission-denied: "<red>You do not meet the requirements to activate that booster."
+  cancelled: "<yellow>The activation was cancelled by another plugin."
+  group-occupied: "<yellow>That activation group is currently occupied."
+  queue-limit: "<red>Your booster queue is full."
+  duration-limit: "<red>That activation would exceed the maximum queued duration."
+  player-not-ready: "<yellow>Your boosters are still loading."
+
+inventory:
+  granted: "<green>Granted <name> x<amount>. New amount: <new>."
+  granted-forced: "<green>Force-granted <name> x<amount>. New amount: <new>."
+  revoked: "<green>Revoked <name> x<amount>. New amount: <new>."
+  set: "<green>Set <name> amount to <new>."
+  unchanged: "<yellow>No inventory changes were needed."
+  claim-created: "<yellow>Inventory is full. Created a pending reward for <name> x<amount>."
+  duplicate-request: "<yellow>That request was already processed."
+  idempotency-conflict: "<red>That request reference conflicts with a previous mutation."
+  definition-not-found: "<red>That booster does not exist."
+  insufficient: "<red>The player does not have enough boosters."
+  limit-reached: "<red>The player's inventory limit would be exceeded."
+  player-not-ready: "<yellow>The target player's boosters are not ready."
+  permission-denied: "<red>You do not have permission for that forced mutation."
+
+transfer:
+  transferred-sender: "<green>Sent <name> x<amount> to <recipient>."
+  transferred-recipient: "<green>You received <name> x<amount> from <sender>."
+  same-player: "<red>You cannot transfer boosters to yourself."
+  recipient-not-online: "<red>The recipient must be online in this server."
+  not-transferable: "<red>That booster cannot be transferred."
+  invalid-amount: "<red>That transfer amount is not allowed."
+  insufficient: "<red>You do not have enough boosters."
+  recipient-full: "<red>The recipient does not have enough inventory space."
+  cooldown: "<yellow>You can transfer again in <remaining>."
+  permission-denied: "<red>You do not have permission to transfer that booster."
+  player-not-ready: "<yellow>One of the players is not ready yet."
+
+deactivation:
+  deactivated: "<green>Deactivated booster <activation>."
+  expired: "<green>Expired booster <activation>."
+  not-found: "<red>That activation was not found."
+  already-inactive: "<yellow>That activation is already inactive."
+  player-not-ready: "<yellow>The target player's boosters are not ready."
+
+admin:
+  reload-success: "<green>NetworkBoosters reloaded. Definitions: <definitions>. Warnings: <warnings>."
+  reload-failed: "<red>Reload failed: <reason>"
+  reload-restart-required: "<red>Reload rejected. These paths require restart: <paths>."
+  inspect-header: "<aqua>NetworkBoosters inspection for <player>"
+  inspect-body:
+    - "<gray>Online: <white><online></white>"
+    - "<gray>Settings ready: <white><settings_ready></white>"
+    - "<gray>Boosters ready: <white><boosters_ready></white>"
+    - "<gray>Local revision: <white><local_revision></white>"
+    - "<gray>Persisted revision: <white><persisted_revision></white>"
+    - "<gray>Inventory: <white><used></white>/<white><capacity></white> <dark_gray>(<capacity_rule>)</dark_gray>"
+    - "<gray>Active: <white><active></white> Queue: <white><queued></white> Claims: <white><claims></white>"
+    - "<gray>Redis: <white><redis></white>"
+  deactivated-all: "<green>Requested deactivation for <amount> active booster(s)."
+  target-not-ready: "<yellow>The target player is not ready."
+
+placeholder:
+  true: "true"
+  false: "false"
+
+time:
+  now: "now"
+  day: "d"
+  days: "d"
+  hour: "h"
+  hours: "h"
+  minute: "m"
+  minutes: "m"
+  second: "s"
+  seconds: "s"
+
+boosters:
+  personal_points_x2:
+    name: "<aqua>Personal Points Booster"
+    description:
+      - "<gray>Doubles the points you earn."

@@ -3,6 +3,8 @@ package com.stephanofer.networkboosters.config;
 import com.stephanofer.networkboosters.config.booster.BoosterDefinitionLoader;
 import com.stephanofer.networkboosters.config.booster.BoosterDefinitionRegistry;
 import com.stephanofer.networkboosters.config.booster.DefinitionChanges;
+import com.stephanofer.networkboosters.localization.LocalizationLoader;
+import com.stephanofer.networkboosters.localization.LocalizationSnapshot;
 import dev.dejvokep.boostedyaml.YamlDocument;
 import dev.dejvokep.boostedyaml.dvs.versioning.BasicVersioning;
 import dev.dejvokep.boostedyaml.settings.loader.LoaderSettings;
@@ -20,6 +22,8 @@ public final class ConfigurationLoader {
 
     private static final String CONFIG_RESOURCE = "config.yml";
     private static final String EXAMPLE_BOOSTER_RESOURCE = "boosters/personal_points_x2.yml";
+    private static final String SPANISH_MESSAGES_RESOURCE = "messages/es.yml";
+    private static final String ENGLISH_MESSAGES_RESOURCE = "messages/en.yml";
 
     private final File dataFolder;
     private final Function<String, InputStream> resources;
@@ -44,6 +48,14 @@ public final class ConfigurationLoader {
         BoosterDefinitionRegistry definitions = configuration == null
             ? BoosterDefinitionRegistry.empty()
             : new BoosterDefinitionLoader(new File(this.dataFolder, "boosters"), configuration).load(issues);
+        LocalizationSnapshot localization = configuration == null
+            ? null
+            : new LocalizationLoader(this.dataFolder, this.resources).load(
+                configuration.localization().fallbackLanguage(),
+                configuration.localization().consoleLanguage(),
+                definitions.definitions(),
+                issues
+            );
 
         List<ConfigurationIssue> errors = issues.stream()
             .filter(issue -> issue.severity() == ConfigurationIssue.Severity.ERROR)
@@ -67,7 +79,7 @@ public final class ConfigurationLoader {
         List<ConfigurationIssue> warnings = issues.stream()
             .filter(issue -> issue.severity() == ConfigurationIssue.Severity.WARNING)
             .toList();
-        return new ConfigurationSnapshot(0, configuration, definitions, changes, configurationChanges, warnings);
+        return new ConfigurationSnapshot(0, configuration, definitions, localization, changes, configurationChanges, warnings);
     }
 
     private NetworkBoostersConfiguration loadGlobalConfiguration(List<ConfigurationIssue> issues) {
@@ -101,6 +113,10 @@ public final class ConfigurationLoader {
             if (!boostersDirectoryAlreadyExisted) {
                 copyIfMissing(new File(boostersDirectory, "personal_points_x2.yml"), EXAMPLE_BOOSTER_RESOURCE);
             }
+            File messagesDirectory = new File(this.dataFolder, "messages");
+            Files.createDirectories(messagesDirectory.toPath());
+            copyIfMissing(new File(messagesDirectory, "es.yml"), SPANISH_MESSAGES_RESOURCE);
+            copyIfMissing(new File(messagesDirectory, "en.yml"), ENGLISH_MESSAGES_RESOURCE);
         } catch (IOException exception) {
             issues.add(ConfigurationIssue.error(".", "$", "Failed to prepare configuration files: " + exception.getMessage()));
         }

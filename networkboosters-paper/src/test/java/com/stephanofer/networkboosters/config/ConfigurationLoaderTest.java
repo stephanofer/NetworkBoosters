@@ -170,6 +170,18 @@ class ConfigurationLoaderTest {
     }
 
     private InputStream resource(String path) {
+        if (path.equals("messages/es.yml") || path.equals("messages/en.yml")) {
+            try (InputStream embedded = ConfigurationLoaderTest.class.getClassLoader().getResourceAsStream(path)) {
+                if (embedded == null) {
+                    return null;
+                }
+                String content = new String(embedded.readAllBytes(), StandardCharsets.UTF_8)
+                    .replace("  personal_points_x2:", "  new_points:\n    name: \"<aqua>New Points\"\n    description:\n      - \"<gray>Extra test booster.\"\n  bad:\n    name: \"<aqua>Bad\"\n    description:\n      - \"<gray>Invalid test booster.\"\n  personal_points_x2:");
+                return new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+            } catch (IOException exception) {
+                return null;
+            }
+        }
         String content = switch (path) {
             case "config.yml" -> this.configContent;
             case "boosters/personal_points_x2.yml" -> validBooster("personal_points_x2", "2.0");
