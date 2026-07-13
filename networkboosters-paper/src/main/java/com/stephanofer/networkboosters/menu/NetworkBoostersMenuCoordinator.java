@@ -50,7 +50,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.scheduler.BukkitTask;
 
 public final class NetworkBoostersMenuCoordinator implements Listener, AutoCloseable {
 
@@ -71,12 +70,10 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
     private final ConcurrentHashMap<UUID, Boolean> activeClaims = new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
     private final DurationFormatter durations = new DurationFormatter();
-    private final BukkitTask temporalMenuTask;
 
     public NetworkBoostersMenuCoordinator(NetworkBoostersCommandRuntime runtime, ZMenuIntegration zmenu) {
         this.runtime = Objects.requireNonNull(runtime, "runtime");
         this.zmenu = Objects.requireNonNull(zmenu, "zmenu");
-        this.temporalMenuTask = runtime.server().getScheduler().runTaskTimer(runtime.plugin(), this::refreshTemporalMenus, 20L, 20L);
     }
 
     public MenuSession session(Player player) {
@@ -448,6 +445,29 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
         return placeholders;
     }
 
+    public Placeholders claimPlaceholders(Player player, BoosterClaim claim) {
+        Placeholders placeholders = this.basePlaceholders(player);
+        placeholders.register("claim_id", claim.claimId().toString());
+        placeholders.register("booster_id", claim.boosterId().value());
+        placeholders.register("booster_name", this.runtime.localization().boosterNameTemplate(player, claim.boosterId().value()));
+        placeholders.register("amount", String.valueOf(claim.amount()));
+        placeholders.register("claim_source", claim.source().name().toLowerCase(java.util.Locale.ROOT));
+        this.runtime.service().definition(claim.boosterId()).ifPresentOrElse(definition -> {
+            placeholders.register("multiplier", definition.multiplier().toPlainString());
+            placeholders.register("duration", this.format(player, definition.duration()));
+            placeholders.register("target", definition.target().key());
+            placeholders.register("category", definition.category().value());
+            placeholders.register("modalities", this.modalities(player, definition.scope()));
+        }, () -> {
+            placeholders.register("multiplier", "?");
+            placeholders.register("duration", "?");
+            placeholders.register("target", "?");
+            placeholders.register("category", "?");
+            placeholders.register("modalities", "?");
+        });
+        return placeholders;
+    }
+
     public ItemStack applyDisplay(OwnedBoosterView view, ItemStack itemStack) {
         BoosterDisplay display = this.runtime.configurationStore().requireCurrent().definitions().display(view.boosterId());
         String materialName = switch (view.state()) {
@@ -501,27 +521,6 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
         Player player = this.runtime.server().getPlayer(playerId);
         if (player != null) {
             this.update(player);
-        }
-    }
-
-    private void refreshTemporalMenus() {
-        if (this.closed.get() || !this.runtime.isRunning()) {
-            return;
-        }
-        for (Player player : this.runtime.server().getOnlinePlayers()) {
-            if (!(player.getOpenInventory().getTopInventory().getHolder() instanceof fr.maxlego08.menu.api.engine.InventoryEngine engine)) {
-                continue;
-            }
-            var menu = engine.getMenuInventory();
-            if (menu == null || menu.getPlugin() != this.runtime.plugin() || !STATUS_MENU.equals(menu.getFileName())) {
-                continue;
-            }
-            for (var button : engine.getButtons()) {
-                if (button instanceof com.stephanofer.networkboosters.menu.button.BoosterTimelineButton
-                    || button instanceof com.stephanofer.networkboosters.menu.button.TimelineEmptyStateButton) {
-                    engine.buildButton(button, new Placeholders());
-                }
-            }
         }
     }
 
@@ -628,7 +627,6 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
     @Override
     public void close() {
         this.closed.set(true);
-        this.temporalMenuTask.cancel();
         this.sessions.clear();
         this.activeOperations.clear();
         this.activeClaims.clear();

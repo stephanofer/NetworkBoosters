@@ -4,7 +4,6 @@ import com.stephanofer.networkboosters.api.player.BoosterClaim;
 import com.stephanofer.networkboosters.menu.NetworkBoostersMenuCoordinator;
 import fr.maxlego08.menu.api.button.PaginateButton;
 import fr.maxlego08.menu.api.engine.InventoryEngine;
-import fr.maxlego08.menu.api.utils.Placeholders;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -33,10 +32,7 @@ public final class ClaimsButton extends PaginateButton {
         int end = Math.min(claims.size(), start + slots.size());
         for (int index = start; index < end; index++) {
             BoosterClaim claim = claims.get(index);
-            Placeholders placeholders = this.coordinator.basePlaceholders(player);
-            placeholders.register("claim_id", claim.claimId().toString());
-            placeholders.register("booster_id", claim.boosterId().value());
-            placeholders.register("amount", String.valueOf(claim.amount()));
+            var placeholders = this.coordinator.claimPlaceholders(player, claim);
             var itemButton = inventoryEngine.addItem(slots.get(index - start), this.getCustomItemStack(player, false, placeholders));
             if (itemButton != null) {
                 itemButton.setClick(event -> this.coordinator.claim(player, claim));

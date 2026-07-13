@@ -17,20 +17,26 @@ items:
     item:
       material: VAULT
       name:
-        default: "<gold>%booster_id% x%amount%"
+        default: "<gold><bold>%booster_name% <gray>x%amount%"
         locales:
-          es: "<gold>%booster_id% x%amount%"
-          en: "<gold>%booster_id% x%amount%"
+          es: "<gold><bold>%booster_name% <gray>x%amount%"
+          en: "<gold><bold>%booster_name% <gray>x%amount%"
       lore:
         default:
-          - "<gray>Claim: <white>%claim_id%</white>"
+          - "<gray>Multiplier: <aqua>x%multiplier%</aqua>"
+          - "<gray>Duration: <white>%duration%</white>"
+          - "<gray>Modalities: <white>%modalities%</white>"
           - "<yellow>Click to claim."
         locales:
           es:
-            - "<gray>Recompensa: <white>%claim_id%</white>"
+            - "<gray>Multiplicador: <aqua>x%multiplier%</aqua>"
+            - "<gray>Duración: <white>%duration%</white>"
+            - "<gray>Modalidades: <white>%modalities%</white>"
             - "<yellow>Click para reclamar."
           en:
-            - "<gray>Claim: <white>%claim_id%</white>"
+            - "<gray>Multiplier: <aqua>x%multiplier%</aqua>"
+            - "<gray>Duration: <white>%duration%</white>"
+            - "<gray>Modalities: <white>%modalities%</white>"
             - "<yellow>Click to claim."
   empty-claims:
     type: NETWORKBOOSTERS_EMPTY_CLAIMS

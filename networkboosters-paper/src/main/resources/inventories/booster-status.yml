@@ -4,14 +4,12 @@ name:
     es: "<dark_gray>Cronología de boosters <gray>(%page%/%max-page%)"
     en: "<dark_gray>Booster timeline <gray>(%page%/%max-page%)"
 size: 54
-update-interval: 1000
 patterns:
   - networkboosters-pagination
 
 items:
   timeline:
     type: NETWORKBOOSTERS_TIMELINE
-    update: true
     slots:
       - 10-16
       - 19-25

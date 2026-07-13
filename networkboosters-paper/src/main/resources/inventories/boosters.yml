@@ -6,13 +6,13 @@ name:
     es: "<dark_gray>Potenciadores <gray>(%page%/%max-page%)"
     en: "<dark_gray>Boosters <gray>(%page%/%max-page%)"
 size: 54
-update-interval: 1000
 patterns:
   - networkboosters-pagination
 
 items:
   summary:
     type: NETWORKBOOSTERS_SUMMARY
+    is-permanent: true
     slot: 3
     item:
       material: VAULT
@@ -41,8 +41,8 @@ items:
 
   status:
     type: NETWORKBOOSTERS_STATUS
+    is-permanent: true
     slot: 5
-    update: true
     item:
       material: BEACON
       name:
@@ -90,6 +90,7 @@ items:
             - "<yellow>Click to view the timeline."
   filter:
     type: NETWORKBOOSTERS_FILTER
+    is-permanent: true
     slot: 45
     item:
       material: ECHO_SHARD
@@ -130,6 +131,7 @@ items:
 
   sort:
     type: NETWORKBOOSTERS_SORT
+    is-permanent: true
     slot: 46
     item:
       material: AMETHYST_SHARD
@@ -158,6 +160,7 @@ items:
 
   claims:
     type: NETWORKBOOSTERS_OPEN_CLAIMS
+    is-permanent: true
     slot: 53
     item:
       material: VAULT
