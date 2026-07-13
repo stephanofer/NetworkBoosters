@@ -30,6 +30,7 @@ public record NetworkBoostersConfiguration(
     Limits limits,
     Activation activation,
     InventoryLimits inventoryLimits,
+    ScopeDisplay scopeDisplay,
     Localization localization,
     Commands commands,
     PlaceholderApi placeholderApi
@@ -47,6 +48,7 @@ public record NetworkBoostersConfiguration(
         Objects.requireNonNull(limits, "limits");
         Objects.requireNonNull(activation, "activation");
         Objects.requireNonNull(inventoryLimits, "inventoryLimits");
+        Objects.requireNonNull(scopeDisplay, "scopeDisplay");
         Objects.requireNonNull(localization, "localization");
         Objects.requireNonNull(commands, "commands");
         Objects.requireNonNull(placeholderApi, "placeholderApi");
@@ -66,7 +68,7 @@ public record NetworkBoostersConfiguration(
         Objects.requireNonNull(issues, "issues");
 
         Integer version = requiredInt(config, "config-version", issues);
-        if (version != null && version != 1) {
+        if (version != null && version != 2) {
             error(issues, "config-version", "Unsupported config-version: " + version);
         }
 
@@ -77,6 +79,7 @@ public record NetworkBoostersConfiguration(
         Section limits = requiredSection(config, "limits", issues);
         Section activation = requiredSection(config, "activation", issues);
         Section inventoryLimits = requiredSection(config, "inventory-limits", issues);
+        Section scopeDisplay = requiredSection(config, "scope-display", issues);
         Section localization = requiredSection(config, "localization", issues);
         Section commands = requiredSection(config, "commands", issues);
         Section placeholderApi = requiredSection(config, "placeholderapi", issues);
@@ -89,6 +92,7 @@ public record NetworkBoostersConfiguration(
         Limits limitsConfig = parseLimits(limits, issues);
         Activation activationConfig = parseActivation(activation, issues);
         InventoryLimits inventoryLimitsConfig = parseInventoryLimits(inventoryLimits, issues);
+        ScopeDisplay scopeDisplayConfig = parseScopeDisplay(scopeDisplay, issues);
         Localization localizationConfig = parseLocalization(localization, issues);
         Commands commandsConfig = parseCommands(commands, issues);
         PlaceholderApi placeholderApiConfig = parsePlaceholderApi(placeholderApi, issues);
@@ -105,6 +109,7 @@ public record NetworkBoostersConfiguration(
             limitsConfig,
             activationConfig,
             inventoryLimitsConfig,
+            scopeDisplayConfig,
             localizationConfig,
             commandsConfig,
             placeholderApiConfig
@@ -289,6 +294,17 @@ public record NetworkBoostersConfiguration(
                 throw new IllegalArgumentException("fallback cannot be negative");
             }
             tiers = List.copyOf(Objects.requireNonNull(tiers, "tiers"));
+        }
+    }
+
+    public record ScopeDisplay(Map<String, String> games) {
+
+        public ScopeDisplay {
+            games = Map.copyOf(Objects.requireNonNull(games, "games"));
+        }
+
+        public Optional<String> game(String gameId) {
+            return Optional.ofNullable(this.games.get(Objects.requireNonNull(gameId, "gameId")));
         }
     }
 
@@ -522,6 +538,29 @@ public record NetworkBoostersConfiguration(
         }
         rules.sort((left, right) -> left.id().compareTo(right.id()));
         return issues.size() > issueCount || fallback == null ? null : new InventoryLimits(fallback, rules);
+    }
+
+    private static ScopeDisplay parseScopeDisplay(Section scopeDisplay, List<ConfigurationIssue> issues) {
+        if (scopeDisplay == null) {
+            return null;
+        }
+        Section games = requiredSection(scopeDisplay, "games", "scope-display.games", issues);
+        if (games == null) {
+            return null;
+        }
+        Map<String, String> labels = new LinkedHashMap<>();
+        for (Object key : games.getKeys()) {
+            String rawId = String.valueOf(key);
+            String id = normalizeOrIssue(rawId, "scope-display.games." + rawId, ID_WITH_DOTS, issues);
+            String label = requiredString(games, rawId, "scope-display.games." + rawId, issues);
+            if (id != null && label != null) {
+                String previous = labels.putIfAbsent(id, label);
+                if (previous != null) {
+                    error(issues, "scope-display.games." + rawId, "Duplicate game ID after normalization");
+                }
+            }
+        }
+        return new ScopeDisplay(labels);
     }
 
     private static Commands parseCommands(Section commands, List<ConfigurationIssue> issues) {

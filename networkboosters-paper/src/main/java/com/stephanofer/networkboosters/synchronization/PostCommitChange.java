@@ -18,6 +18,7 @@ public sealed interface PostCommitChange permits
     PostCommitChange.ActivationDeactivated,
     PostCommitChange.ActivationExpired,
     PostCommitChange.InventoryChanged,
+    PostCommitChange.ClaimCreated,
     PostCommitChange.ClaimCompleted,
     PostCommitChange.TransferCompleted,
     PostCommitChange.TransferObserved,
@@ -211,6 +212,28 @@ public sealed interface PostCommitChange permits
                 this.snapshot.playerId(),
                 this.snapshot.revision(),
                 BoosterChangeType.CLAIMED,
+                Optional.of(this.claim.claimId())
+            ));
+        }
+    }
+
+    record ClaimCreated(PlayerBoostSnapshot snapshot, BoosterClaim claim) implements PostCommitChange {
+        public ClaimCreated {
+            Objects.requireNonNull(snapshot, "snapshot");
+            Objects.requireNonNull(claim, "claim");
+        }
+
+        @Override
+        public List<PlayerBoostSnapshot> snapshots() {
+            return List.of(this.snapshot);
+        }
+
+        @Override
+        public List<BoosterInvalidation.PlayerChange> invalidations() {
+            return List.of(new BoosterInvalidation.PlayerChange(
+                this.snapshot.playerId(),
+                this.snapshot.revision(),
+                BoosterChangeType.CLAIM_CREATED,
                 Optional.of(this.claim.claimId())
             ));
         }

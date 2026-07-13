@@ -42,6 +42,58 @@ public final class BoosterMenuViews {
             .toList();
     }
 
+    public static int visibleUnitCount(List<OwnedBoosterView> views) {
+        Objects.requireNonNull(views, "views");
+        long total = 0;
+        for (OwnedBoosterView view : views) {
+            if (Long.MAX_VALUE - total < view.amount()) {
+                return Integer.MAX_VALUE;
+            }
+            total += view.amount();
+            if (total >= Integer.MAX_VALUE) {
+                return Integer.MAX_VALUE;
+            }
+        }
+        return (int) total;
+    }
+
+    public static List<OwnedBoosterView> page(List<OwnedBoosterView> views, int page, int pageSize) {
+        Objects.requireNonNull(views, "views");
+        if (page < 1 || pageSize < 1) {
+            throw new IllegalArgumentException("page and pageSize must be positive");
+        }
+        long skip;
+        try {
+            skip = Math.multiplyExact((long) page - 1, pageSize);
+        } catch (ArithmeticException ignored) {
+            return List.of();
+        }
+        ArrayList<OwnedBoosterView> result = new ArrayList<>(pageSize);
+        long cursor = 0;
+        for (OwnedBoosterView view : views) {
+            long end;
+            try {
+                end = Math.addExact(cursor, view.amount());
+            } catch (ArithmeticException ignored) {
+                end = Long.MAX_VALUE;
+            }
+            if (skip < end && result.size() < pageSize) {
+                long first = Math.max(skip, cursor);
+                long available = end - first;
+                int copies = (int) Math.min(available, pageSize - result.size());
+                for (int index = 0; index < copies; index++) {
+                    result.add(view);
+                }
+                skip = end;
+            }
+            cursor = end;
+            if (result.size() == pageSize || cursor == Long.MAX_VALUE) {
+                break;
+            }
+        }
+        return List.copyOf(result);
+    }
+
     private static OwnedBoosterView view(
         PlayerBoostSnapshot snapshot,
         BoosterDefinition definition,

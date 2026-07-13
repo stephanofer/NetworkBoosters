@@ -219,6 +219,10 @@ public final class BoosterDefinitionLoader {
         if (type == null || games == null || servers == null) {
             return null;
         }
+        if (!servers.equals(Set.of(BoosterScope.WILDCARD))) {
+            error(issues, source, "scope.servers", "Only '*' is supported because modality scopes apply to all of their servers");
+            return null;
+        }
         try {
             return new BoosterScope(type, games, servers);
         } catch (IllegalArgumentException exception) {

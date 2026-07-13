@@ -166,9 +166,9 @@ Un scope define dónde puede aplicarse una activación:
 
 - tipo personal;
 - modalidades permitidas;
-- servidores permitidos.
+- todos los servidores pertenecientes a cada modalidad permitida.
 
-La primera versión usa boosters personales. `*` significa cualquier modalidad o servidor.
+La primera versión usa boosters personales. `*` significa cualquier modalidad. `server_scopes` se conserva en el contrato y la persistencia, pero las definiciones deben declarar `servers: ["*"]`: una modalidad siempre incluye todos sus servidores. La UI muestra únicamente modalidades.
 
 ### 5.5 Booster poseído
 
@@ -180,7 +180,7 @@ public record OwnedBooster(
 ) {}
 ```
 
-Las unidades idénticas se agregan por cantidad. No se crea una fila por cada unidad porque no aportaría identidad individual y aumentaría almacenamiento y complejidad.
+Las unidades idénticas se agregan por cantidad. No se crea una fila por cada unidad porque no aportaría identidad individual y aumentaría almacenamiento y complejidad. El menú proyecta cada unidad como un ítem visual independiente sin alterar este modelo agregado.
 
 ### 5.6 Booster activo
 
@@ -208,7 +208,7 @@ Una entrada de cola ya fue consumida del inventario, pero su duración aún no e
 
 ### 5.8 Recompensa pendiente
 
-Una recompensa pendiente es una entrega durable del sistema que no entró en el inventario por falta de capacidad. No se usa para transferencias entre jugadores.
+Una recompensa pendiente es una entrega durable protegida que no debe perderse por falta de capacidad. Se limita a compras, compensaciones y creación administrativa explícita; no se usa para recompensas normales ni transferencias entre jugadores.
 
 ## 6. Semántica temporal
 
@@ -530,12 +530,10 @@ Una recompensa del sistema o compra verificada no puede desaparecer porque el in
 ### 10.2 Orígenes admitidos
 
 - compras;
-- crates;
-- pase de batalla;
-- eventos;
-- recompensas diarias;
 - compensaciones;
-- integraciones confiables del sistema.
+- creación administrativa explícita.
+
+Crates, pase de batalla, eventos, recompensas diarias, modalidades y entregas generales del sistema no crean claims. Si no hay capacidad, `grant` devuelve `INVENTORY_LIMIT_REACHED` y el sistema origen decide si rechaza, conserva o descarta su recompensa. Una crate consumible debe comprobar capacidad antes de gastar la llave, sin sustituir la validación transaccional definitiva.
 
 ### 10.3 Flujo
 
@@ -1157,7 +1155,7 @@ No existe configuración de máximo por booster.
 ### 19.3 Configuración global de ejemplo
 
 ```yaml
-config-version: 1
+config-version: 2
 
 server:
   id: "skywars-01"
@@ -1195,6 +1193,11 @@ commands:
 
 placeholderapi:
   enabled: true
+
+scope-display:
+  games:
+    skywars: "SkyWars"
+    bedwars: "BedWars"
 ```
 
 ### 19.4 Validación
@@ -1229,12 +1232,13 @@ Si una definición desaparece:
 
 `/boosters admin reload`:
 
-1. carga YAML en estructuras temporales;
+1. carga YAML en estructuras temporales fuera del hilo principal;
 2. valida configuración, idiomas, boosters y menús;
 3. conserva íntegramente el estado anterior si algo falla;
-4. reemplaza el snapshot de configuración de forma atómica;
+4. vuelve al hilo principal de Paper;
 5. recarga zMenu mediante el plan de CraftKit;
-6. informa definiciones cargadas, errores y warnings.
+6. reemplaza el snapshot de configuración de forma atómica;
+7. informa definiciones cargadas, errores y warnings.
 
 No se recrean durante reload:
 
@@ -1295,7 +1299,6 @@ Incluye:
 - cola por grupo;
 - filtro y orden;
 - claims pendientes;
-- transferencia;
 - navegación;
 - estado vacío;
 - estados de carga y error.
@@ -1372,19 +1375,9 @@ Orden predeterminado:
 
 `PendingActivation` guarda ID, página, filtro, token y expiración corta. No guarda referencias mutables.
 
-### 22.6 Confirmación de transferencia
+### 22.6 Transferencias
 
-Muestra:
-
-- destinatario;
-- booster;
-- cantidad;
-- inventario resultante del emisor;
-- capacidad conocida del receptor;
-- cooldown o restricciones;
-- botones confirmar y cancelar.
-
-La confirmación vuelve a validar todos los datos.
+Los menús no inician ni confirman transferencias. La única interfaz de jugador es `/boosters transfer <player> <booster> [amount]`, con suggestions de Brigadier. Esto evita un selector de cabezas que no escala y mantiene un único flujo operativo. El servicio revalida todos los datos y ejecuta la transferencia atómicamente.
 
 ### 22.7 Estado desactualizado
 
@@ -1413,6 +1406,7 @@ Si cambia inventario, permiso, capacidad, definición o cola entre menús, la op
 /boosters admin give <player> <booster> [amount] --force
 /boosters admin take <player> <booster> [amount]
 /boosters admin set <player> <booster> <amount>
+/boosters admin claim <player> <booster> [amount]
 /boosters admin activate <player> <booster>
 /boosters admin deactivate <player> [activation-id|all]
 /boosters admin inspect <player>
@@ -1431,6 +1425,7 @@ networkboosters.admin.give
 networkboosters.admin.give.force
 networkboosters.admin.take
 networkboosters.admin.set
+networkboosters.admin.claim
 networkboosters.admin.activate
 networkboosters.admin.deactivate
 networkboosters.admin.inspect
@@ -1807,7 +1802,8 @@ El sistema está listo cuando:
 - La capacidad depende de permisos y cuenta solo inventario sin consumir.
 - No existen límites por booster.
 - Perder rango no elimina boosters.
-- Los rewards del sistema sin espacio se guardan como claims.
+- Solo compras, compensaciones y entregas administrativas sin espacio se guardan como claims.
+- Crates, pase, eventos, diarias, modalidades y entregas generales sin espacio se rechazan sin crear claims.
 - Transferencias sin espacio se rechazan y no generan claims.
 - La API pública usa snapshots inmutables, resultados tipados y `BigDecimal`.
 - Menús, comandos, eventos y placeholders son bordes de la misma lógica de dominio, no implementaciones paralelas.

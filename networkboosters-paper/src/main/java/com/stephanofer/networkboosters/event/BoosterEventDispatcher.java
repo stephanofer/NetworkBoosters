@@ -4,6 +4,7 @@ import com.stephanofer.networkboosters.api.booster.ActiveBooster;
 import com.stephanofer.networkboosters.api.booster.QueuedBooster;
 import com.stephanofer.networkboosters.api.event.BoosterActivateEvent;
 import com.stephanofer.networkboosters.api.event.BoosterClaimEvent;
+import com.stephanofer.networkboosters.api.event.BoosterClaimCreatedEvent;
 import com.stephanofer.networkboosters.api.event.BoosterDeactivateEvent;
 import com.stephanofer.networkboosters.api.event.BoosterEventOrigin;
 import com.stephanofer.networkboosters.api.event.BoosterExpireEvent;
@@ -145,6 +146,9 @@ public final class BoosterEventDispatcher implements AutoCloseable {
             ));
             case PostCommitChange.ClaimCompleted claim -> this.call(new BoosterClaimEvent(
                 claim.snapshot(), origin, sourceServerId, claim.claim(), claim.inventoryAmount()
+            ));
+            case PostCommitChange.ClaimCreated claim -> this.call(new BoosterClaimCreatedEvent(
+                claim.snapshot(), origin, sourceServerId, claim.claim()
             ));
             case PostCommitChange.TransferCompleted transfer -> this.call(new BoosterTransferEvent(
                 transfer.result().transferId().orElseThrow(),

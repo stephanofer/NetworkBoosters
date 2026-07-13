@@ -1,16 +1,19 @@
+config-version: "2"
+
 name:
   default: "<dark_gray>Boosters <gray>(%page%/%max-page%)"
   locales:
     es: "<dark_gray>Potenciadores <gray>(%page%/%max-page%)"
     en: "<dark_gray>Boosters <gray>(%page%/%max-page%)"
 size: 54
+update-interval: 1000
 patterns:
   - networkboosters-pagination
 
 items:
   summary:
     type: NETWORKBOOSTERS_SUMMARY
-    slot: 4
+    slot: 3
     item:
       material: VAULT
       name:
@@ -36,6 +39,55 @@ items:
             - "<gray>Queue: <white>%queue_count%</white>"
             - "<gray>Claims: <white>%claims_count%</white>"
 
+  status:
+    type: NETWORKBOOSTERS_STATUS
+    slot: 5
+    update: true
+    item:
+      material: BEACON
+      name:
+        default: "<aqua><bold>Booster Status"
+        locales:
+          es: "<aqua><bold>Estado de Boosters"
+          en: "<aqua><bold>Booster Status"
+      lore:
+        default:
+          - "<gray>Active: <white>%status_active_name%</white>"
+          - "<gray>Multiplier: <aqua>x%status_multiplier%</aqua>"
+          - "<gray>Remaining: <white>%status_remaining%</white>"
+          - "<gray>Modalities: <white>%status_modalities%</white>"
+          - ""
+          - "<gray>Queue: <white>%status_queue_count%</white>"
+          - "<gray>Next: <white>%status_next_name%</white>"
+          - "<gray>Starts in: <white>%status_next_starts%</white>"
+          - "<gray>Scheduled time: <white>%status_scheduled%</white>"
+          - ""
+          - "<yellow>Click to view the timeline."
+        locales:
+          es:
+            - "<gray>Activo: <white>%status_active_name%</white>"
+            - "<gray>Multiplicador: <aqua>x%status_multiplier%</aqua>"
+            - "<gray>Restante: <white>%status_remaining%</white>"
+            - "<gray>Modalidades: <white>%status_modalities%</white>"
+            - ""
+            - "<gray>En cola: <white>%status_queue_count%</white>"
+            - "<gray>Siguiente: <white>%status_next_name%</white>"
+            - "<gray>Comienza en: <white>%status_next_starts%</white>"
+            - "<gray>Tiempo programado: <white>%status_scheduled%</white>"
+            - ""
+            - "<yellow>Click para ver la cronología."
+          en:
+            - "<gray>Active: <white>%status_active_name%</white>"
+            - "<gray>Multiplier: <aqua>x%status_multiplier%</aqua>"
+            - "<gray>Remaining: <white>%status_remaining%</white>"
+            - "<gray>Modalities: <white>%status_modalities%</white>"
+            - ""
+            - "<gray>Queue: <white>%status_queue_count%</white>"
+            - "<gray>Next: <white>%status_next_name%</white>"
+            - "<gray>Starts in: <white>%status_next_starts%</white>"
+            - "<gray>Scheduled time: <white>%status_scheduled%</white>"
+            - ""
+            - "<yellow>Click to view the timeline."
   filter:
     type: NETWORKBOOSTERS_FILTER
     slot: 45
@@ -135,36 +187,33 @@ items:
     item:
       material: TRIAL_KEY
       name:
-        default: "<aqua><bold>%booster_id%"
+        default: "<aqua><bold>%booster_name%"
         locales:
-          es: "<aqua><bold>%booster_id%"
-          en: "<aqua><bold>%booster_id%"
+          es: "<aqua><bold>%booster_name%"
+          en: "<aqua><bold>%booster_name%"
       lore:
         default:
-          - "<gray>Amount: <white>%amount%</white>"
           - "<gray>Multiplier: <aqua>x%multiplier%</aqua>"
           - "<gray>Duration: <white>%duration%</white>"
+          - "<gray>Modalities: <white>%modalities%</white>"
           - "<gray>State: <white>%state%</white>"
           - ""
           - "<yellow>Left click to activate."
-          - "<yellow>Right click to transfer."
         locales:
           es:
-            - "<gray>Cantidad: <white>%amount%</white>"
             - "<gray>Multiplicador: <aqua>x%multiplier%</aqua>"
             - "<gray>Duración: <white>%duration%</white>"
+            - "<gray>Modalidades: <white>%modalities%</white>"
             - "<gray>Estado: <white>%state%</white>"
             - ""
             - "<yellow>Click izquierdo para activar."
-            - "<yellow>Click derecho para transferir."
           en:
-            - "<gray>Amount: <white>%amount%</white>"
             - "<gray>Multiplier: <aqua>x%multiplier%</aqua>"
             - "<gray>Duration: <white>%duration%</white>"
+            - "<gray>Modalities: <white>%modalities%</white>"
             - "<gray>State: <white>%state%</white>"
             - ""
             - "<yellow>Left click to activate."
-            - "<yellow>Right click to transfer."
 
   empty-owned:
     type: NETWORKBOOSTERS_EMPTY_OWNED

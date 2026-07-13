@@ -167,6 +167,29 @@ class ConfigurationLoaderTest {
     }
 
     @Test
+    void rejectsServerSpecificScopesBecauseModalitiesCoverEveryServer() throws IOException {
+        Files.createDirectories(this.tempDir.resolve("boosters"));
+        Files.writeString(this.tempDir.resolve("boosters/server-specific.yml"), validBooster("server_specific", "2.0")
+            .replace("  servers:\n    - \"*\"", "  servers:\n    - skywars-01"));
+
+        ConfigurationException exception = assertThrows(ConfigurationException.class, () -> loader().load());
+
+        assertTrue(exception.issues().stream().anyMatch(issue ->
+            issue.path().equals("scope.servers") && issue.message().contains("Only '*'")));
+    }
+
+    @Test
+    void requiresReadableNamesForExplicitModalities() throws IOException {
+        Files.createDirectories(this.tempDir.resolve("boosters"));
+        Files.writeString(this.tempDir.resolve("boosters/unmapped.yml"), validBooster("unmapped", "2.0")
+            .replace("  games:\n    - \"*\"", "  games:\n    - bedwars"));
+
+        ConfigurationException exception = assertThrows(ConfigurationException.class, () -> loader().load());
+
+        assertTrue(exception.issues().stream().anyMatch(issue -> issue.path().equals("scope-display.games.bedwars")));
+    }
+
+    @Test
     void bootstrapCommandsUseDefaultsWithoutPreparingFullResources() {
         NetworkBoostersConfiguration.Commands commands = loader().loadBootstrapCommands();
 

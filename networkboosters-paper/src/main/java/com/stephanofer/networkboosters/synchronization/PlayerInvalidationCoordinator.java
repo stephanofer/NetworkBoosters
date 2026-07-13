@@ -130,6 +130,9 @@ public final class PlayerInvalidationCoordinator implements AutoCloseable {
                 case EXPIRED -> marker.referenceId().flatMap(id -> activeById(previous, id))
                     .ifPresent(active -> changes.add(new PostCommitChange.ActivationExpired(current, Optional.of(active), Optional.empty())));
                 case CLAIMED -> changes.add(new PostCommitChange.StateChanged(current, marker.type(), marker.referenceId()));
+                case CLAIM_CREATED -> marker.referenceId()
+                    .flatMap(id -> current.pendingClaims().stream().filter(claim -> claim.claimId().equals(id)).findFirst())
+                    .ifPresent(claim -> changes.add(new PostCommitChange.ClaimCreated(current, claim)));
                 case TRANSFERRED -> marker.transfer().ifPresentOrElse(transfer -> {
                     // The sender is the deterministic reporter when both snapshots are locally relevant.
                     if (current.playerId().equals(transfer.senderId())) {

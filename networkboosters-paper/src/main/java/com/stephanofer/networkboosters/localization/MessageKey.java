@@ -32,6 +32,12 @@ public enum MessageKey {
     SUMMARY_CLAIMS("summary.claims"),
     SUMMARY_HINT("summary.hint"),
 
+    SCOPE_ALL_MODALITIES("scope.all-modalities"),
+
+    STATUS_NONE("status.none"),
+    STATUS_ACTIVE("status.active"),
+    STATUS_QUEUED("status.queued"),
+
     LIST_HEADER("list.header"),
     LIST_ENTRY("list.entry"),
     LIST_EMPTY("list.empty"),
@@ -52,6 +58,7 @@ public enum MessageKey {
     CLAIMS_NOT_FOUND("claims.not-found"),
     CLAIMS_ALREADY_CLAIMED("claims.already-claimed"),
     CLAIMS_INVENTORY_FULL("claims.inventory-full"),
+    CLAIMS_RECEIVED("claims.received"),
 
     ACTIVATION_ACTIVATED("activation.activated"),
     ACTIVATION_EXTENDED("activation.extended"),
@@ -110,6 +117,7 @@ public enum MessageKey {
     ADMIN_INSPECT_BODY("admin.inspect-body"),
     ADMIN_DEACTIVATED_ALL("admin.deactivated-all"),
     ADMIN_TARGET_NOT_READY("admin.target-not-ready"),
+    ADMIN_CLAIM_CREATED("admin.claim-created"),
 
     PLACEHOLDER_TRUE("placeholder.true"),
     PLACEHOLDER_FALSE("placeholder.false"),

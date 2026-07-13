@@ -28,6 +28,8 @@ dependencies {
     testImplementation(libs.mockito.core)
     testImplementation(libs.paper.api)
     testRuntimeOnly(libs.junit.platform.launcher)
+    testRuntimeOnly(libs.network.player.settings)
+    testRuntimeOnly(libs.zmenu.api)
 
     mockitoAgent(libs.mockito.core) {
         isTransitive = false

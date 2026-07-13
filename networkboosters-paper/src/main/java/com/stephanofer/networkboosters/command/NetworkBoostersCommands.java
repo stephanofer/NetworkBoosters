@@ -9,6 +9,7 @@ import com.stephanofer.networkboosters.api.player.PlayerBoostSnapshot;
 import com.stephanofer.networkboosters.api.request.ActivationRequest;
 import com.stephanofer.networkboosters.api.request.BoosterTransferRequest;
 import com.stephanofer.networkboosters.api.request.ClaimRequest;
+import com.stephanofer.networkboosters.api.request.ClaimCreationRequest;
 import com.stephanofer.networkboosters.api.request.DeactivationRequest;
 import com.stephanofer.networkboosters.api.request.InventoryGrantRequest;
 import com.stephanofer.networkboosters.api.request.InventoryRevokeRequest;
@@ -24,6 +25,7 @@ import com.stephanofer.networkboosters.api.result.InventoryMutationStatus;
 import com.stephanofer.networkboosters.api.result.TransferResult;
 import com.stephanofer.networkboosters.api.result.TransferStatus;
 import com.stephanofer.networkboosters.api.source.ActivationSource;
+import com.stephanofer.networkboosters.api.source.ClaimSource;
 import com.stephanofer.networkboosters.api.source.DeactivationReason;
 import com.stephanofer.networkboosters.api.source.MutationSource;
 import com.stephanofer.networkboosters.api.source.SourceReference;
@@ -75,25 +77,9 @@ public final class NetworkBoostersCommands {
     }
 
     public void register(PaperCommandManager.Bootstrapped<CommandSourceStack> manager) {
-        this.registerSuggestions(manager);
         for (String root : this.roots) {
             this.registerRoot(manager, root);
         }
-    }
-
-    private void registerSuggestions(PaperCommandManager.Bootstrapped<CommandSourceStack> manager) {
-        manager.parserRegistry().registerSuggestionProvider("networkboosters-online-players", (context, input) ->
-            suggestions(this.suggestOnlinePlayers(input.peekString())));
-        manager.parserRegistry().registerSuggestionProvider("networkboosters-owned", (context, input) ->
-            suggestions(this.suggestOwnedBoosters(context.sender().getSender(), input.peekString())));
-        manager.parserRegistry().registerSuggestionProvider("networkboosters-transferable", (context, input) ->
-            suggestions(this.suggestTransferableBoosters(context.sender().getSender(), input.peekString())));
-        manager.parserRegistry().registerSuggestionProvider("networkboosters-definitions", (context, input) ->
-            suggestions(this.suggestDefinitions(input.peekString())));
-        manager.parserRegistry().registerSuggestionProvider("networkboosters-claims", (context, input) ->
-            suggestions(this.suggestClaims(context.sender().getSender(), input.peekString())));
-        manager.parserRegistry().registerSuggestionProvider("networkboosters-activations", (context, input) ->
-            suggestions(this.suggestActivations(context.getOrDefault("player", ""), input.peekString())));
     }
 
     private static CompletableFuture<List<Suggestion>> suggestions(List<String> values) {
@@ -110,13 +96,14 @@ public final class NetworkBoostersCommands {
         manager.command(manager.commandBuilder(root).literal("claims").optional("page", stringParser(), this.claimPages()).permission("networkboosters.command.claims").handler(context -> this.claims(context.sender().getSender(), context.getOrDefault("page", "1"))));
         manager.command(manager.commandBuilder(root).literal("claim").required("claim", stringParser(), this.claims()).permission("networkboosters.command.claims").handler(context -> this.claim(context.sender().getSender(), context.get("claim"))));
         manager.command(manager.commandBuilder(root).literal("activate").required("booster", stringParser(), this.ownedBoosters()).permission("networkboosters.command.activate").handler(context -> this.activate(context.sender().getSender(), context.get("booster"))));
-        manager.command(manager.commandBuilder(root).literal("transfer").required("player", stringParser(), this.transferTargets()).required("booster", stringParser(), this.transferableBoosters()).optional("amount", stringParser(), this.transferAmounts()).permission("networkboosters.command.transfer").handler(context -> this.transfer(context.sender().getSender(), context.get("player"), context.get("booster"), context.getOrDefault("amount", "1"))));
+        manager.command(manager.commandBuilder(root).literal("transfer").required("player", stringParser(), this.transferTargets()).required("booster", stringParser(), this.transferableBoosters()).optional("amount", stringParser(), this.transferAmounts()).permission("networkboosters.command.transfer").handler(context -> this.transfer(context.sender().getSender(), context.get("player"), context.get("booster"), context.getOrDefault("amount", ""))));
 
         manager.command(manager.commandBuilder(root).literal("admin").literal("give").required("player", stringParser(), this.onlinePlayers()).required("booster", stringParser(), this.definitions()).optional("amount", stringParser(), this.commonAmounts()).permission("networkboosters.admin.give").handler(context -> this.adminGive(context.sender().getSender(), context.get("player"), context.get("booster"), context.getOrDefault("amount", "1"), false)));
         manager.command(manager.commandBuilder(root).literal("admin").literal("give").required("player", stringParser(), this.onlinePlayers()).required("booster", stringParser(), this.definitions()).required("amount", stringParser(), this.commonAmounts()).literal("--force").permission("networkboosters.admin.give.force").handler(context -> this.adminGive(context.sender().getSender(), context.get("player"), context.get("booster"), context.get("amount"), true)));
         manager.command(manager.commandBuilder(root).literal("admin").literal("take").required("player", stringParser(), this.onlinePlayers()).required("booster", stringParser(), this.definitions()).optional("amount", stringParser(), this.adminTakeAmounts()).permission("networkboosters.admin.take").handler(context -> this.adminTake(context.sender().getSender(), context.get("player"), context.get("booster"), context.getOrDefault("amount", "1"))));
         manager.command(manager.commandBuilder(root).literal("admin").literal("set").required("player", stringParser(), this.onlinePlayers()).required("booster", stringParser(), this.definitions()).required("amount", stringParser(), this.adminSetAmounts()).permission("networkboosters.admin.set").handler(context -> this.adminSet(context.sender().getSender(), context.get("player"), context.get("booster"), context.get("amount"), false)));
         manager.command(manager.commandBuilder(root).literal("admin").literal("set").required("player", stringParser(), this.onlinePlayers()).required("booster", stringParser(), this.definitions()).required("amount", stringParser(), this.adminSetAmounts()).literal("--force").permission("networkboosters.admin.give.force").handler(context -> this.adminSet(context.sender().getSender(), context.get("player"), context.get("booster"), context.get("amount"), true)));
+        manager.command(manager.commandBuilder(root).literal("admin").literal("claim").required("player", stringParser(), this.onlinePlayers()).required("booster", stringParser(), this.definitions()).optional("amount", stringParser(), this.commonAmounts()).permission("networkboosters.admin.claim").handler(context -> this.adminClaim(context.sender().getSender(), context.get("player"), context.get("booster"), context.getOrDefault("amount", "1"))));
         manager.command(manager.commandBuilder(root).literal("admin").literal("activate").required("player", stringParser(), this.onlinePlayers()).required("booster", stringParser(), this.definitions()).permission("networkboosters.admin.activate").handler(context -> this.adminActivate(context.sender().getSender(), context.get("player"), context.get("booster"))));
         manager.command(manager.commandBuilder(root).literal("admin").literal("deactivate").required("player", stringParser(), this.onlinePlayers()).required("activation", stringParser(), this.activations()).permission("networkboosters.admin.deactivate").handler(context -> this.adminDeactivate(context.sender().getSender(), context.get("player"), context.get("activation"))));
         manager.command(manager.commandBuilder(root).literal("admin").literal("inspect").required("player", stringParser(), this.onlinePlayers()).permission("networkboosters.admin.inspect").handler(context -> this.inspect(context.sender().getSender(), context.get("player"))));
@@ -179,7 +166,7 @@ public final class NetworkBoostersCommands {
         return (context, input) -> suggestions(suggestCommonAmounts(input.peekString()));
     }
 
-    private List<String> suggestOnlinePlayers(String input) {
+    List<String> suggestOnlinePlayers(String input) {
         return this.bridge.runtime()
             .map(runtime -> runtime.server().getOnlinePlayers().stream()
                 .map(Player::getName)
@@ -189,7 +176,7 @@ public final class NetworkBoostersCommands {
             .orElse(List.of());
     }
 
-    private List<String> suggestTransferTargets(CommandSender sender, String input) {
+    List<String> suggestTransferTargets(CommandSender sender, String input) {
         if (!(sender instanceof Player player)) {
             return List.of();
         }
@@ -204,7 +191,7 @@ public final class NetworkBoostersCommands {
             .orElse(List.of());
     }
 
-    private List<String> suggestDefinitions(String input) {
+    List<String> suggestDefinitions(String input) {
         return this.bridge.runtime()
             .map(runtime -> runtime.service().definitions().stream()
                 .map(definition -> definition.id().value())
@@ -214,7 +201,7 @@ public final class NetworkBoostersCommands {
             .orElse(List.of());
     }
 
-    private List<String> suggestOwnedBoosters(CommandSender sender, String input) {
+    List<String> suggestOwnedBoosters(CommandSender sender, String input) {
         if (!(sender instanceof Player player)) {
             return List.of();
         }
@@ -229,7 +216,7 @@ public final class NetworkBoostersCommands {
             .orElse(List.of());
     }
 
-    private List<String> suggestTransferableBoosters(CommandSender sender, String input) {
+    List<String> suggestTransferableBoosters(CommandSender sender, String input) {
         if (!(sender instanceof Player player)) {
             return List.of();
         }
@@ -239,7 +226,9 @@ public final class NetworkBoostersCommands {
                 .filter(entry -> entry.getValue() > 0)
                 .map(entry -> entry.getKey())
                 .filter(boosterId -> runtime.service().definition(boosterId)
-                    .map(definition -> definition.transferPolicy().enabled())
+                    .map(definition -> definition.enabled()
+                        && definition.transferPolicy().enabled()
+                        && definition.transferPolicy().permission().map(player::hasPermission).orElse(true))
                     .orElse(false))
                 .map(BoosterId::value)
                 .filter(id -> startsWith(id, input))
@@ -299,7 +288,7 @@ public final class NetworkBoostersCommands {
             .orElse(List.of());
     }
 
-    private List<String> suggestTransferAmounts(CommandSender sender, String rawBooster, String input) {
+    List<String> suggestTransferAmounts(CommandSender sender, String rawBooster, String input) {
         if (!(sender instanceof Player player) || rawBooster == null || rawBooster.isBlank()) {
             return List.of();
         }
@@ -311,10 +300,13 @@ public final class NetworkBoostersCommands {
                     return List.<String>of();
                 }
                 long owned = runtime.service().getCachedOrEmpty(player.getUniqueId()).ownedAmount(boosterId);
-                long maximum = runtime.service().definition(boosterId)
-                    .map(definition -> Math.min(owned, definition.transferPolicy().maximumAmount()))
-                    .orElse(0L);
-                return amountSuggestions(maximum, input);
+                return runtime.service().definition(boosterId)
+                    .map(definition -> amountSuggestions(
+                        definition.transferPolicy().minimumAmount(),
+                        Math.min(owned, definition.transferPolicy().maximumAmount()),
+                        input
+                    ))
+                    .orElse(List.of());
             })
             .orElse(List.of());
     }
@@ -374,15 +366,18 @@ public final class NetworkBoostersCommands {
             .toList();
     }
 
-    private static List<String> amountSuggestions(long maximum, String input) {
-        if (maximum < 1) {
+    static List<String> amountSuggestions(long maximum, String input) {
+        return amountSuggestions(1, maximum, input);
+    }
+
+    static List<String> amountSuggestions(long minimum, long maximum, String input) {
+        if (minimum < 1 || maximum < minimum) {
             return List.of();
         }
         ArrayList<String> suggestions = new ArrayList<>();
-        for (long candidate : List.of(1L, 2L, 5L, 10L, 32L, 64L, maximum)) {
-            long value = Math.min(candidate, maximum);
+        for (long value : List.of(minimum, 1L, 2L, 5L, 10L, 32L, 64L, maximum)) {
             String text = String.valueOf(value);
-            if (!suggestions.contains(text) && startsWith(text, input)) {
+            if (value >= minimum && value <= maximum && !suggestions.contains(text) && startsWith(text, input)) {
                 suggestions.add(text);
             }
         }
@@ -635,8 +630,13 @@ public final class NetworkBoostersCommands {
                 return;
             }
             BoosterId boosterId = parseBooster(sender, runtime, rawBooster);
-            long amount = parsePositiveAmount(sender, runtime, rawAmount);
-            if (boosterId == null || amount < 1) {
+            if (boosterId == null) {
+                return;
+            }
+            long amount = rawAmount.isBlank()
+                ? runtime.service().definition(boosterId).map(definition -> definition.transferPolicy().minimumAmount()).orElse(1L)
+                : parsePositiveAmount(sender, runtime, rawAmount);
+            if (amount < 1) {
                 return;
             }
             runtime.service().transfer(new BoosterTransferRequest(player.getUniqueId(), recipient.getUniqueId(), boosterId, amount, TransferSource.PLAYER_COMMAND, reference(runtime, player, "transfer")))
@@ -704,6 +704,40 @@ public final class NetworkBoostersCommands {
             }
             runtime.service().activate(new ActivationRequest(target.getUniqueId(), boosterId, ActivationSource.ADMIN_COMMAND, reference(runtime, sender, "admin activate")))
                 .whenComplete((result, failure) -> sync(runtime, sender, () -> sendActivationResult(sender, runtime, result, failure, boosterId)));
+        });
+    }
+
+    private void adminClaim(CommandSender sender, String targetName, String rawBooster, String rawAmount) {
+        this.withRuntime(sender, runtime -> {
+            Player target = target(sender, runtime, targetName);
+            BoosterId boosterId = parseBooster(sender, runtime, rawBooster);
+            long amount = parsePositiveAmount(sender, runtime, rawAmount);
+            if (target == null || boosterId == null || amount < 1) {
+                return;
+            }
+            runtime.service().createClaim(new ClaimCreationRequest(
+                target.getUniqueId(),
+                boosterId,
+                amount,
+                ClaimSource.ADMIN_COMMAND,
+                reference(runtime, sender, "admin claim")
+            )).whenComplete((result, failure) -> sync(runtime, sender, () -> {
+                if (failure != null || result == null || result.status() != InventoryMutationStatus.CLAIM_CREATED) {
+                    sendInventoryResult(sender, runtime, result, failure, amount);
+                    return;
+                }
+                BoosterClaim claim = result.claim().orElseThrow();
+                send(sender, runtime, MessageKey.ADMIN_CLAIM_CREATED,
+                    MessageArguments.text("player", target.getName()),
+                    MessageArguments.component("name", runtime.localization().boosterName(sender, boosterId.value())),
+                    MessageArguments.text("amount", amount),
+                    MessageArguments.text("claim", claim.claimId()));
+                if (target.isOnline()) {
+                    send(target, runtime, MessageKey.CLAIMS_RECEIVED,
+                        MessageArguments.component("name", runtime.localization().boosterName(target, boosterId.value())),
+                        MessageArguments.text("amount", amount));
+                }
+            }));
         });
     }
 
@@ -788,6 +822,11 @@ public final class NetworkBoostersCommands {
                             .map(queuedBooster -> "#" + queuedBooster.position() + " " + queuedBooster.boosterId().value() + " " + queuedBooster.duration().toMillis() + "ms")
                             .collect(java.util.stream.Collectors.joining(" -> ")) + "]")
                         .collect(java.util.stream.Collectors.joining(", "));
+                String claimDetails = snapshot.pendingClaims().isEmpty()
+                    ? "empty"
+                    : snapshot.pendingClaims().stream()
+                        .map(claim -> claim.claimId() + " " + claim.boosterId().value() + " x" + claim.amount() + " source=" + claim.source().name())
+                        .collect(java.util.stream.Collectors.joining(", "));
                 for (Component line : runtime.localization().lines(sender, MessageKey.ADMIN_INSPECT_BODY,
                     MessageArguments.text("online", target.isOnline()),
                     MessageArguments.text("settings_ready", runtime.playerSettings().isReady(target.getUniqueId())),
@@ -804,6 +843,7 @@ public final class NetworkBoostersCommands {
                     MessageArguments.text("inventory_breakdown", inventory),
                     MessageArguments.text("active_breakdown", active),
                     MessageArguments.text("queue_breakdown", queue),
+                    MessageArguments.text("claims_breakdown", claimDetails),
                     MessageArguments.text("redis", runtime.redisStatus()))) {
                     sender.sendMessage(line);
                 }

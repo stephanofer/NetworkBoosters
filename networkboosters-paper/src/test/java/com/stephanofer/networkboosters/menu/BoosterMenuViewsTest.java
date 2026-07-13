@@ -20,6 +20,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 final class BoosterMenuViewsTest {
 
@@ -80,6 +81,32 @@ final class BoosterMenuViewsTest {
 
         assertEquals(1, views.size());
         assertEquals(BoosterVisualState.ORPHANED, views.getFirst().state());
+    }
+
+    @Test
+    void paginatesAggregatedAmountsAsIndependentVisualUnits() {
+        BoosterId firstId = BoosterId.of("first");
+        BoosterId secondId = BoosterId.of("second");
+        OwnedBoosterView first = new OwnedBoosterView(firstId, 5, Optional.empty(), BoosterVisualState.ORPHANED, false, false, false, Optional.empty(), java.util.List.of());
+        OwnedBoosterView second = new OwnedBoosterView(secondId, 3, Optional.empty(), BoosterVisualState.ORPHANED, false, false, false, Optional.empty(), java.util.List.of());
+
+        assertEquals(8, BoosterMenuViews.visibleUnitCount(java.util.List.of(first, second)));
+        var page = BoosterMenuViews.page(java.util.List.of(first, second), 2, 4);
+        assertEquals(4, page.size());
+        assertSame(first, page.getFirst());
+        assertSame(second, page.get(1));
+        assertSame(second, page.getLast());
+    }
+
+    @Test
+    void hugeAmountsAreSaturatedWithoutMaterializingEveryUnit() {
+        OwnedBoosterView huge = new OwnedBoosterView(
+            BoosterId.of("huge"), Long.MAX_VALUE, Optional.empty(), BoosterVisualState.ORPHANED,
+            false, false, false, Optional.empty(), java.util.List.of()
+        );
+
+        assertEquals(Integer.MAX_VALUE, BoosterMenuViews.visibleUnitCount(java.util.List.of(huge)));
+        assertEquals(21, BoosterMenuViews.page(java.util.List.of(huge), 1000, 21).size());
     }
 
     private static BoosterDefinition definition(BoosterId id, int order, ActivationRequirements requirements) {

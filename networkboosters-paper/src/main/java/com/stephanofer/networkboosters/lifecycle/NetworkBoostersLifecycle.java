@@ -31,7 +31,9 @@ import com.stephanofer.networkboosters.config.ConfigurationStore;
 import com.stephanofer.networkboosters.config.NetworkBoostersConfiguration;
 import com.stephanofer.networkboosters.localization.LocalizationService;
 import com.stephanofer.networkboosters.menu.NetworkBoostersMenuCoordinator;
+import com.stephanofer.networkboosters.menu.MenuConfigurationUpdater;
 import com.stephanofer.networkboosters.menu.loader.ClaimsButtonLoader;
+import com.stephanofer.networkboosters.menu.loader.BoosterTimelineButtonLoader;
 import com.stephanofer.networkboosters.menu.loader.OwnedBoostersButtonLoader;
 import com.stephanofer.networkboosters.menu.loader.SimpleMenuButtonLoader;
 import com.stephanofer.networkboosters.menu.loader.TransferTargetsButtonLoader;
@@ -269,26 +271,59 @@ public final class NetworkBoostersLifecycle implements Listener, NetworkBoosters
         if (!this.reloadInProgress.compareAndSet(false, true)) {
             return CompletableFuture.completedFuture(new ReloadReport(false, false, "A reload is already in progress", 0, 0));
         }
-        return CompletableFuture.supplyAsync(this::reloadNow)
+        return CompletableFuture.supplyAsync(this::prepareReload)
+            .thenCompose(preparation -> preparation.report() != null
+                ? CompletableFuture.completedFuture(preparation.report())
+                : this.commitReload(preparation.candidate()))
             .whenComplete((ignored, failure) -> this.reloadInProgress.set(false));
     }
 
-    private ReloadReport reloadNow() {
+    private ReloadPreparation prepareReload() {
         try {
             ConfigurationLoader loader = new ConfigurationLoader(this.plugin.getDataFolder(), this.plugin::getResource);
             ConfigurationSnapshot candidate = loader.load(this.configurationStore.requireCurrent());
             if (this.state.get() != LifecycleState.RUNNING) {
-                return new ReloadReport(false, false, "Lifecycle stopped during reload", 0, 0);
+                return ReloadPreparation.finished(new ReloadReport(false, false, "Lifecycle stopped during reload", 0, 0));
             }
             if (candidate.configurationChanges().requiresRestart()) {
-                return new ReloadReport(
+                return ReloadPreparation.finished(new ReloadReport(
                     false,
                     true,
                     String.join(", ", candidate.configurationChanges().restartRequiredPaths()),
                     candidate.definitions().size(),
                     candidate.warnings().size()
-                );
+                ));
             }
+            return ReloadPreparation.ready(candidate);
+        } catch (Throwable throwable) {
+            this.logger.warn("NetworkBoosters reload preparation failed; previous configuration remains active", throwable);
+            return ReloadPreparation.finished(new ReloadReport(false, false, throwable.getMessage(), 0, 0));
+        }
+    }
+
+    private CompletableFuture<ReloadReport> commitReload(ConfigurationSnapshot candidate) {
+        CompletableFuture<ReloadReport> result = new CompletableFuture<>();
+        try {
+            this.plugin.getServer().getScheduler().runTask(this.plugin, () -> {
+                try {
+                    if (this.state.get() != LifecycleState.RUNNING) {
+                        result.complete(new ReloadReport(false, false, "Lifecycle stopped during reload", 0, 0));
+                        return;
+                    }
+                    result.complete(this.commitReloadNow(candidate));
+                } catch (Throwable throwable) {
+                    this.logger.warn("NetworkBoosters reload commit failed; previous configuration remains active", throwable);
+                    result.complete(new ReloadReport(false, false, throwable.getMessage(), 0, 0));
+                }
+            });
+        } catch (Throwable throwable) {
+            result.complete(new ReloadReport(false, false, throwable.getMessage(), 0, 0));
+        }
+        return result;
+    }
+
+    private ReloadReport commitReloadNow(ConfigurationSnapshot candidate) {
+        try {
             if (this.zmenu != null) {
                 this.zmenu.reload();
             }
@@ -300,11 +335,20 @@ public final class NetworkBoostersLifecycle implements Listener, NetworkBoosters
                 published.warnings().size()
             );
             return new ReloadReport(true, false, "", published.definitions().size(), published.warnings().size());
-        } catch (IllegalArgumentException exception) {
-            return new ReloadReport(false, true, exception.getMessage(), 0, 0);
         } catch (Throwable throwable) {
             this.logger.warn("NetworkBoosters reload failed; previous configuration remains active", throwable);
             return new ReloadReport(false, false, throwable.getMessage(), 0, 0);
+        }
+    }
+
+    private record ReloadPreparation(ConfigurationSnapshot candidate, ReloadReport report) {
+
+        private static ReloadPreparation ready(ConfigurationSnapshot candidate) {
+            return new ReloadPreparation(java.util.Objects.requireNonNull(candidate, "candidate"), null);
+        }
+
+        private static ReloadPreparation finished(ReloadReport report) {
+            return new ReloadPreparation(null, java.util.Objects.requireNonNull(report, "report"));
         }
     }
 
@@ -567,6 +611,11 @@ public final class NetworkBoostersLifecycle implements Listener, NetworkBoosters
 
     private void startZMenu() {
         long started = System.nanoTime();
+        try {
+            MenuConfigurationUpdater.update(this.plugin.getDataFolder(), this.plugin::getResource);
+        } catch (java.io.IOException exception) {
+            throw new IllegalStateException("Failed to update NetworkBoosters menu configuration", exception);
+        }
         this.zmenu = ZMenus.require(this.plugin);
         this.menuCoordinator = new NetworkBoostersMenuCoordinator(this, this.zmenu);
         this.zmenu.bootstrap()
@@ -574,7 +623,10 @@ public final class NetworkBoostersLifecycle implements Listener, NetworkBoosters
                 registry.button(new OwnedBoostersButtonLoader(this.plugin, this.menuCoordinator));
                 registry.button(new TransferTargetsButtonLoader(this.plugin, this.menuCoordinator));
                 registry.button(new ClaimsButtonLoader(this.plugin, this.menuCoordinator));
+                registry.button(new BoosterTimelineButtonLoader(this.plugin, this.menuCoordinator));
                 registry.button(SimpleMenuButtonLoader.summary(this.plugin, this.menuCoordinator));
+                registry.button(SimpleMenuButtonLoader.status(this.plugin, this.menuCoordinator));
+                registry.button(SimpleMenuButtonLoader.timelineEmpty(this.plugin, this.menuCoordinator));
                 registry.button(SimpleMenuButtonLoader.filter(this.plugin, this.menuCoordinator));
                 registry.button(SimpleMenuButtonLoader.sort(this.plugin, this.menuCoordinator));
                 registry.button(SimpleMenuButtonLoader.openClaims(this.plugin, this.menuCoordinator));
@@ -592,7 +644,8 @@ public final class NetworkBoostersLifecycle implements Listener, NetworkBoosters
                 "inventories/booster-confirm.yml",
                 "inventories/booster-transfer-target.yml",
                 "inventories/booster-transfer.yml",
-                "inventories/booster-claims.yml"
+                "inventories/booster-claims.yml",
+                "inventories/booster-status.yml"
             )
             .defaultPatterns("patterns/pagination.yml")
             .patterns("patterns")

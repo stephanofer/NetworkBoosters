@@ -7,6 +7,7 @@ public enum BoosterChangeType {
     QUEUED,
     DEACTIVATED,
     EXPIRED,
+    CLAIM_CREATED,
     CLAIMED,
     TRANSFERRED
 }

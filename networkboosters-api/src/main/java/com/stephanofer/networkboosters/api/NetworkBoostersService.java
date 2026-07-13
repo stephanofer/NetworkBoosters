@@ -8,6 +8,7 @@ import com.stephanofer.networkboosters.api.player.PlayerBoostSnapshot;
 import com.stephanofer.networkboosters.api.request.ActivationRequest;
 import com.stephanofer.networkboosters.api.request.BoosterTransferRequest;
 import com.stephanofer.networkboosters.api.request.ClaimRequest;
+import com.stephanofer.networkboosters.api.request.ClaimCreationRequest;
 import com.stephanofer.networkboosters.api.request.DeactivationRequest;
 import com.stephanofer.networkboosters.api.request.InventoryGrantRequest;
 import com.stephanofer.networkboosters.api.request.InventoryRevokeRequest;
@@ -54,6 +55,8 @@ public interface NetworkBoostersService {
     CompletableFuture<TransferResult> transfer(BoosterTransferRequest request);
 
     CompletableFuture<ClaimResult> claim(ClaimRequest request);
+
+    CompletableFuture<InventoryMutationResult> createClaim(ClaimCreationRequest request);
 
     CompletableFuture<DeactivationResult> deactivate(DeactivationRequest request);
 }

@@ -5,6 +5,7 @@ import com.stephanofer.networkboosters.api.booster.BoosterDefinition;
 import com.stephanofer.networkboosters.api.booster.BoosterId;
 import com.stephanofer.networkboosters.api.event.BoosterActivateEvent;
 import com.stephanofer.networkboosters.api.event.BoosterClaimEvent;
+import com.stephanofer.networkboosters.api.event.BoosterClaimCreatedEvent;
 import com.stephanofer.networkboosters.api.event.BoosterDeactivateEvent;
 import com.stephanofer.networkboosters.api.event.BoosterExpireEvent;
 import com.stephanofer.networkboosters.api.event.BoosterExtendEvent;
@@ -49,6 +50,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.scheduler.BukkitTask;
 
 public final class NetworkBoostersMenuCoordinator implements Listener, AutoCloseable {
 
@@ -57,6 +59,7 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
     public static final String TRANSFER_TARGET_MENU = "booster-transfer-target";
     public static final String TRANSFER_MENU = "booster-transfer";
     public static final String CLAIMS_MENU = "booster-claims";
+    public static final String STATUS_MENU = "booster-status";
 
     private static final Duration ACTIVATION_TTL = Duration.ofSeconds(30);
     private static final Duration TRANSFER_TTL = Duration.ofSeconds(45);
@@ -68,10 +71,12 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
     private final ConcurrentHashMap<UUID, Boolean> activeClaims = new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
     private final DurationFormatter durations = new DurationFormatter();
+    private final BukkitTask temporalMenuTask;
 
     public NetworkBoostersMenuCoordinator(NetworkBoostersCommandRuntime runtime, ZMenuIntegration zmenu) {
         this.runtime = Objects.requireNonNull(runtime, "runtime");
         this.zmenu = Objects.requireNonNull(zmenu, "zmenu");
+        this.temporalMenuTask = runtime.server().getScheduler().runTaskTimer(runtime.plugin(), this::refreshTemporalMenus, 20L, 20L);
     }
 
     public MenuSession session(Player player) {
@@ -80,6 +85,10 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
 
     public List<OwnedBoosterView> views(Player player) {
         MenuSession session = this.session(player);
+        return this.views(player, session.filter());
+    }
+
+    private List<OwnedBoosterView> views(Player player, BoosterMenuFilter filter) {
         PlayerBoostSnapshot snapshot = this.runtime.service().getCachedOrEmpty(player.getUniqueId());
         return BoosterMenuViews.ownedViews(
             snapshot,
@@ -87,9 +96,17 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
             player::hasPermission,
             this.runtime.configurationStore().requireCurrent().configuration().gameId(),
             this.runtime.configurationStore().requireCurrent().configuration().serverId(),
-            session.filter(),
-            session.sort()
+            filter,
+            this.session(player).sort()
         );
+    }
+
+    public List<OwnedBoosterView> pageViews(Player player, int page, int pageSize) {
+        return BoosterMenuViews.page(this.views(player), page, pageSize);
+    }
+
+    public int visibleUnitCount(Player player) {
+        return BoosterMenuViews.visibleUnitCount(this.views(player));
     }
 
     public void openMain(Player player) {
@@ -116,8 +133,30 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
         }
     }
 
+    public void openStatus(Player player) {
+        if (this.canTouchUi(player)) {
+            this.zmenu.openWithHistory(player, STATUS_MENU, 1);
+        }
+    }
+
     public void cycleFilter(Player player) {
-        this.sessions.update(player.getUniqueId(), session -> session.withFilter(session.filter().next()));
+        List<OwnedBoosterView> all = this.views(player, BoosterMenuFilter.ALL);
+        int allUnits = BoosterMenuViews.visibleUnitCount(all);
+        List<BoosterMenuFilter> useful = new java.util.ArrayList<>();
+        useful.add(BoosterMenuFilter.ALL);
+        for (BoosterMenuFilter filter : BoosterMenuFilter.values()) {
+            if (filter == BoosterMenuFilter.ALL) {
+                continue;
+            }
+            int filteredUnits = BoosterMenuViews.visibleUnitCount(this.views(player, filter));
+            if (filteredUnits > 0 && filteredUnits < allUnits) {
+                useful.add(filter);
+            }
+        }
+        this.sessions.update(player.getUniqueId(), session -> {
+            int current = useful.indexOf(session.filter());
+            return session.withFilter(useful.get((Math.max(current, 0) + 1) % useful.size()));
+        });
         this.update(player);
     }
 
@@ -328,6 +367,42 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
         return placeholders;
     }
 
+    public List<BoosterTimelineView> timeline(Player player) {
+        PlayerBoostSnapshot snapshot = this.runtime.service().getCachedOrEmpty(player.getUniqueId());
+        return BoosterTimelineViews.create(snapshot, this.runtime.clock().instant());
+    }
+
+    public Placeholders statusPlaceholders(Player player) {
+        Placeholders placeholders = this.basePlaceholders(player);
+        List<BoosterTimelineView> timeline = this.timeline(player);
+        BoosterTimelineView active = timeline.stream().filter(BoosterTimelineView::active).findFirst().orElse(null);
+        BoosterTimelineView next = timeline.stream().filter(view -> !view.active()).findFirst().orElse(null);
+        placeholders.register("status_active_name", active == null ? this.runtime.localization().plainMessage(player, MessageKey.STATUS_NONE) : this.runtime.localization().boosterNameTemplate(player, active.boosterId().value()));
+        placeholders.register("status_multiplier", active == null ? "-" : active.multiplier().toPlainString());
+        placeholders.register("status_remaining", active == null ? "-" : this.format(player, active.remainingUntilEnd()));
+        placeholders.register("status_modalities", active == null ? "-" : this.modalities(player, active.scope()));
+        placeholders.register("status_queue_count", String.valueOf(timeline.stream().filter(view -> !view.active()).count()));
+        placeholders.register("status_next_name", next == null ? this.runtime.localization().plainMessage(player, MessageKey.STATUS_NONE) : this.runtime.localization().boosterNameTemplate(player, next.boosterId().value()));
+        placeholders.register("status_next_starts", next == null ? "-" : this.format(player, next.remainingUntilStart()));
+        Duration scheduled = timeline.stream().map(BoosterTimelineView::remainingUntilEnd).max(Duration::compareTo).orElse(Duration.ZERO);
+        placeholders.register("status_scheduled", this.format(player, scheduled));
+        return placeholders;
+    }
+
+    public Placeholders timelinePlaceholders(Player player, BoosterTimelineView view) {
+        Placeholders placeholders = this.basePlaceholders(player);
+        placeholders.register("booster_name", this.runtime.localization().boosterNameTemplate(player, view.boosterId().value()));
+        placeholders.register("timeline_state", this.runtime.localization().plainMessage(player, view.active() ? MessageKey.STATUS_ACTIVE : MessageKey.STATUS_QUEUED));
+        placeholders.register("timeline_group", view.group().value());
+        placeholders.register("timeline_position", view.active() ? "-" : String.valueOf(view.position()));
+        placeholders.register("timeline_multiplier", view.multiplier().toPlainString());
+        placeholders.register("timeline_duration", this.format(player, view.duration()));
+        placeholders.register("timeline_starts", this.format(player, view.remainingUntilStart()));
+        placeholders.register("timeline_remaining", this.format(player, view.remainingUntilEnd()));
+        placeholders.register("modalities", this.modalities(player, view.scope()));
+        return placeholders;
+    }
+
     private void registerFilterPlaceholders(Placeholders placeholders, BoosterMenuFilter active) {
         for (BoosterMenuFilter filter : BoosterMenuFilter.values()) {
             String key = filter.name().toLowerCase(java.util.Locale.ROOT);
@@ -350,6 +425,7 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
         Placeholders placeholders = this.basePlaceholders(player);
         placeholders.register("booster_id", view.boosterId().value());
         placeholders.register("amount", String.valueOf(view.amount()));
+        placeholders.register("booster_name", this.runtime.localization().boosterNameTemplate(player, view.boosterId().value()));
         placeholders.register("state", view.state().name().toLowerCase(java.util.Locale.ROOT));
         placeholders.register("transferable", String.valueOf(view.transferable()));
         view.definition().ifPresentOrElse(definition -> {
@@ -357,6 +433,7 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
             placeholders.register("duration", this.format(player, definition.duration()));
             placeholders.register("target", definition.target().key());
             placeholders.register("category", definition.category().value());
+            placeholders.register("modalities", this.modalities(player, definition.scope()));
             placeholders.register("queue_size", String.valueOf(view.queue().size()));
             placeholders.register("requirements", definition.requirements().permissions().isEmpty() ? "none" : String.join(", ", definition.requirements().permissions()));
         }, () -> {
@@ -364,6 +441,7 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
             placeholders.register("duration", "?");
             placeholders.register("target", "?");
             placeholders.register("category", "?");
+            placeholders.register("modalities", "?");
             placeholders.register("queue_size", "0");
             placeholders.register("requirements", "?");
         });
@@ -391,6 +469,17 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
         return itemStack;
     }
 
+    private String modalities(Player player, com.stephanofer.networkboosters.api.booster.BoosterScope scope) {
+        if (scope.gameIds().contains(com.stephanofer.networkboosters.api.booster.BoosterScope.WILDCARD)) {
+            return this.runtime.localization().plainMessage(player, MessageKey.SCOPE_ALL_MODALITIES);
+        }
+        var labels = this.runtime.configurationStore().requireCurrent().configuration().scopeDisplay();
+        return scope.gameIds().stream()
+            .map(gameId -> labels.game(gameId).orElse(gameId))
+            .sorted(String.CASE_INSENSITIVE_ORDER)
+            .collect(java.util.stream.Collectors.joining(", "));
+    }
+
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         this.sessions.remove(event.getPlayer().getUniqueId());
@@ -405,12 +494,34 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
     @EventHandler public void onExpire(BoosterExpireEvent event) { this.refresh(event.playerId()); }
     @EventHandler public void onDeactivate(BoosterDeactivateEvent event) { this.refresh(event.playerId()); }
     @EventHandler public void onClaim(BoosterClaimEvent event) { this.refresh(event.playerId()); }
+    @EventHandler public void onClaimCreated(BoosterClaimCreatedEvent event) { this.refresh(event.playerId()); }
     @EventHandler public void onTransfer(BoosterTransferEvent event) { this.refresh(event.senderId()); this.refresh(event.recipientId()); }
 
     private void refresh(UUID playerId) {
         Player player = this.runtime.server().getPlayer(playerId);
         if (player != null) {
             this.update(player);
+        }
+    }
+
+    private void refreshTemporalMenus() {
+        if (this.closed.get() || !this.runtime.isRunning()) {
+            return;
+        }
+        for (Player player : this.runtime.server().getOnlinePlayers()) {
+            if (!(player.getOpenInventory().getTopInventory().getHolder() instanceof fr.maxlego08.menu.api.engine.InventoryEngine engine)) {
+                continue;
+            }
+            var menu = engine.getMenuInventory();
+            if (menu == null || menu.getPlugin() != this.runtime.plugin() || !STATUS_MENU.equals(menu.getFileName())) {
+                continue;
+            }
+            for (var button : engine.getButtons()) {
+                if (button instanceof com.stephanofer.networkboosters.menu.button.BoosterTimelineButton
+                    || button instanceof com.stephanofer.networkboosters.menu.button.TimelineEmptyStateButton) {
+                    engine.buildButton(button, new Placeholders());
+                }
+            }
         }
     }
 
@@ -517,6 +628,7 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
     @Override
     public void close() {
         this.closed.set(true);
+        this.temporalMenuTask.cancel();
         this.sessions.clear();
         this.activeOperations.clear();
         this.activeClaims.clear();

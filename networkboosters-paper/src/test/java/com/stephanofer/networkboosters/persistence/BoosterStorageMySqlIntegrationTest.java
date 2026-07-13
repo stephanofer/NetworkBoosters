@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -22,6 +23,8 @@ import com.stephanofer.networkboosters.api.booster.BoosterTarget;
 import com.stephanofer.networkboosters.api.booster.ConflictPolicy;
 import com.stephanofer.networkboosters.api.booster.TransferPolicy;
 import com.stephanofer.networkboosters.api.request.InventoryGrantRequest;
+import com.stephanofer.networkboosters.api.request.ActivationRequest;
+import com.stephanofer.networkboosters.api.result.ActivationStatus;
 import com.stephanofer.networkboosters.api.result.InventoryMutationStatus;
 import com.stephanofer.networkboosters.api.result.TransferStatus;
 import com.stephanofer.networkboosters.api.source.ActivationSource;
@@ -32,6 +35,9 @@ import com.stephanofer.networkboosters.config.ConfigurationSnapshot;
 import com.stephanofer.networkboosters.config.ConfigurationStore;
 import com.stephanofer.networkboosters.config.NetworkBoostersConfiguration;
 import com.stephanofer.networkboosters.config.booster.BoosterDefinitionRegistry;
+import com.stephanofer.networkboosters.booster.ActivationMutationService;
+import com.stephanofer.networkboosters.booster.PlayerPermissionProvider;
+import com.stephanofer.networkboosters.event.BoosterEventDispatcher;
 import com.stephanofer.networkboosters.inventory.InventoryMutationService;
 import com.stephanofer.networkboosters.player.PlayerSnapshotCache;
 import com.stephanofer.networkboosters.synchronization.PostCommitSynchronizer;
@@ -99,6 +105,61 @@ class BoosterStorageMySqlIntegrationTest {
     }
 
     @Test
+    void decrementDeletesTheRowWhenConsumingTheCompleteAmount() {
+        UUID playerId = UUID.randomUUID();
+        BoosterId boosterId = BoosterId.of("personal_points_x2");
+        storage.write(connection -> {
+            storage.inventory().add(connection, playerId, boosterId, 3);
+            assertTrue(storage.inventory().decrement(connection, playerId, boosterId, 3));
+            assertTrue(storage.inventory().amount(connection, playerId, boosterId).isEmpty());
+            return null;
+        }).join();
+
+        assertEquals(0, storage.loadSnapshot(playerId).join().ownedAmount(boosterId));
+    }
+
+    @Test
+    void decrementKeepsAPositiveRowForPartialConsumption() {
+        UUID playerId = UUID.randomUUID();
+        BoosterId boosterId = BoosterId.of("personal_points_x2");
+        storage.write(connection -> {
+            storage.inventory().add(connection, playerId, boosterId, 3);
+            assertTrue(storage.inventory().decrement(connection, playerId, boosterId, 2));
+            assertEquals(1, storage.inventory().amount(connection, playerId, boosterId).orElseThrow());
+            return null;
+        }).join();
+    }
+
+    @Test
+    void decrementDoesNotChangeInsufficientInventory() {
+        UUID playerId = UUID.randomUUID();
+        BoosterId boosterId = BoosterId.of("personal_points_x2");
+        storage.write(connection -> {
+            storage.inventory().add(connection, playerId, boosterId, 2);
+            assertFalse(storage.inventory().decrement(connection, playerId, boosterId, 3));
+            assertEquals(2, storage.inventory().amount(connection, playerId, boosterId).orElseThrow());
+            return null;
+        }).join();
+    }
+
+    @Test
+    void twoConcurrentMutationsCanConsumeTwoInventoryUnits() {
+        UUID playerId = UUID.randomUUID();
+        BoosterId boosterId = BoosterId.of("personal_points_x2");
+        storage.write(connection -> {
+            storage.inventory().add(connection, playerId, boosterId, 2);
+            return null;
+        }).join();
+
+        CompletableFuture<Boolean> first = storage.write(connection -> storage.inventory().decrementOne(connection, playerId, boosterId));
+        CompletableFuture<Boolean> second = storage.write(connection -> storage.inventory().decrementOne(connection, playerId, boosterId));
+
+        assertTrue(first.join());
+        assertTrue(second.join());
+        assertEquals(0, storage.loadSnapshot(playerId).join().ownedAmount(boosterId));
+    }
+
+    @Test
     void inventoryCanTransferAmountAtomicallyInsideOneTransaction() {
         UUID senderId = UUID.randomUUID();
         UUID recipientId = UUID.randomUUID();
@@ -135,6 +196,48 @@ class BoosterStorageMySqlIntegrationTest {
 
         assertEquals(2, storage.loadSnapshot(senderId).join().ownedAmount(boosterId));
         assertEquals(3, storage.loadSnapshot(recipientId).join().ownedAmount(boosterId));
+    }
+
+    @Test
+    void inventoryCanTransferTheCompleteAmountWithoutPersistingZero() {
+        UUID senderId = UUID.randomUUID();
+        UUID recipientId = UUID.randomUUID();
+        BoosterId boosterId = BoosterId.of("personal_points_x2");
+
+        storage.write(connection -> {
+            storage.inventory().add(connection, senderId, boosterId, 1);
+            assertTrue(storage.inventory().decrementOne(connection, senderId, boosterId));
+            storage.inventory().add(connection, recipientId, boosterId, 1);
+            assertTrue(storage.inventory().amount(connection, senderId, boosterId).isEmpty());
+            return null;
+        }).join();
+
+        assertEquals(0, storage.loadSnapshot(senderId).join().ownedAmount(boosterId));
+        assertEquals(1, storage.loadSnapshot(recipientId).join().ownedAmount(boosterId));
+    }
+
+    @Test
+    void activationConsumesTheOnlyInventoryUnit() {
+        UUID playerId = UUID.randomUUID();
+        BoosterId boosterId = BoosterId.of("personal_points_x2");
+        storage.write(connection -> {
+            storage.inventory().add(connection, playerId, boosterId, 1);
+            return null;
+        }).join();
+        ActivationMutationService service = activationService(playerId, configurationStore(boosterId));
+
+        var result = service.activate(new ActivationRequest(
+            playerId,
+            boosterId,
+            ActivationSource.PLAYER_COMMAND,
+            SourceReference.actor(playerId)
+        )).join();
+
+        assertEquals(ActivationStatus.ACTIVATED, result.status());
+        assertEquals(0, result.remainingInventoryAmount());
+        var snapshot = storage.loadSnapshot(playerId).join();
+        assertEquals(0, snapshot.ownedAmount(boosterId));
+        assertEquals(boosterId, snapshot.activeBoosters().values().iterator().next().boosterId());
     }
 
     @Test
@@ -238,9 +341,34 @@ class BoosterStorageMySqlIntegrationTest {
         );
     }
 
+    private static ActivationMutationService activationService(UUID playerId, ConfigurationStore configurationStore) {
+        PlayerSnapshotCache snapshots = mock(PlayerSnapshotCache.class);
+        when(snapshots.isReady(playerId)).thenReturn(true);
+        when(snapshots.getCachedOrEmpty(playerId)).thenReturn(com.stephanofer.networkboosters.api.player.PlayerBoostSnapshot.empty(playerId));
+        PlayerPermissionProvider permissions = mock(PlayerPermissionProvider.class);
+        when(permissions.satisfies(any(), any())).thenReturn(CompletableFuture.completedFuture(true));
+        BoosterEventDispatcher events = mock(BoosterEventDispatcher.class);
+        when(events.callPreActivate(any(), any(), any())).thenReturn(CompletableFuture.completedFuture(true));
+        return new ActivationMutationService(
+            storage,
+            snapshots,
+            configurationStore,
+            permissions,
+            events,
+            PostCommitSynchronizer.noop()
+        );
+    }
+
     private static ConfigurationStore configurationStore(BoosterId boosterId) {
         NetworkBoostersConfiguration configuration = mock(NetworkBoostersConfiguration.class);
         when(configuration.inventoryLimits()).thenReturn(new NetworkBoostersConfiguration.InventoryLimits(30, java.util.List.of()));
+        when(configuration.activation()).thenReturn(new NetworkBoostersConfiguration.Activation(
+            Duration.ofDays(7),
+            10,
+            Duration.ofSeconds(1),
+            100,
+            java.util.List.of()
+        ));
         ConfigurationSnapshot snapshot = mock(ConfigurationSnapshot.class);
         when(snapshot.configuration()).thenReturn(configuration);
         when(snapshot.definitions()).thenReturn(new BoosterDefinitionRegistry(java.util.Map.of(boosterId, definition(boosterId))));

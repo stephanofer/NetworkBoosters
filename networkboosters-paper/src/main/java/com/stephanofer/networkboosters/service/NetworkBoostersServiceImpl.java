@@ -9,6 +9,7 @@ import com.stephanofer.networkboosters.api.player.PlayerBoostSnapshot;
 import com.stephanofer.networkboosters.api.request.ActivationRequest;
 import com.stephanofer.networkboosters.api.request.BoosterTransferRequest;
 import com.stephanofer.networkboosters.api.request.ClaimRequest;
+import com.stephanofer.networkboosters.api.request.ClaimCreationRequest;
 import com.stephanofer.networkboosters.api.request.DeactivationRequest;
 import com.stephanofer.networkboosters.api.request.InventoryGrantRequest;
 import com.stephanofer.networkboosters.api.request.InventoryRevokeRequest;
@@ -132,6 +133,11 @@ public final class NetworkBoostersServiceImpl implements NetworkBoostersService 
     @Override
     public CompletableFuture<ClaimResult> claim(ClaimRequest request) {
         return this.inventoryMutations.claim(request);
+    }
+
+    @Override
+    public CompletableFuture<InventoryMutationResult> createClaim(ClaimCreationRequest request) {
+        return this.inventoryMutations.createClaim(request);
     }
 
     @Override

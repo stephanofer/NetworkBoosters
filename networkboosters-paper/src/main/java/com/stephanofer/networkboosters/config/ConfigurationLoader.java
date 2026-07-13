@@ -60,6 +60,16 @@ public final class ConfigurationLoader {
         BoosterDefinitionRegistry definitions = configuration == null
             ? BoosterDefinitionRegistry.empty()
             : new BoosterDefinitionLoader(new File(this.dataFolder, "boosters"), configuration).load(issues);
+        if (configuration != null) {
+            definitions.definitions().forEach(definition -> definition.scope().gameIds().stream()
+                .filter(gameId -> !gameId.equals(com.stephanofer.networkboosters.api.booster.BoosterScope.WILDCARD))
+                .filter(gameId -> configuration.scopeDisplay().game(gameId).isEmpty())
+                .forEach(gameId -> issues.add(ConfigurationIssue.error(
+                    CONFIG_RESOURCE,
+                    "scope-display.games." + gameId,
+                    "Missing display name required by booster " + definition.id().value()
+                ))));
+        }
         LocalizationSnapshot localization = configuration == null
             ? null
             : new LocalizationLoader(this.dataFolder, this.resources).load(

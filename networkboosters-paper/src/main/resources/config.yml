@@ -1,4 +1,4 @@
-config-version: 1
+config-version: 2
 
 server:
   id: "development-01"
@@ -61,6 +61,10 @@ inventory-limits:
       permission: "networkboosters.capacity.legend"
       maximum: 100
       priority: 200
+
+scope-display:
+  games:
+    development: "Development"
 
 localization:
   fallback-language: en

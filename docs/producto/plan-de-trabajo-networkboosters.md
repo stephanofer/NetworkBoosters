@@ -373,7 +373,7 @@ Construir los flujos visuales sobre casos de uso ya terminados y verificados.
 - filtros y orden;
 - visualización de activos, colas, claims y restricciones;
 - confirmación de activación;
-- confirmación de transferencia;
+- transferencia exclusivamente mediante comando con suggestions;
 - pending states inmutables con expiración;
 - prevención de doble click;
 - estados de carga, vacío y error;

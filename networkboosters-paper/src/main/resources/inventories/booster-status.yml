@@ -1,0 +1,85 @@
+name:
+  default: "<dark_gray>Booster timeline <gray>(%page%/%max-page%)"
+  locales:
+    es: "<dark_gray>Cronología de boosters <gray>(%page%/%max-page%)"
+    en: "<dark_gray>Booster timeline <gray>(%page%/%max-page%)"
+size: 54
+update-interval: 1000
+patterns:
+  - networkboosters-pagination
+
+items:
+  timeline:
+    type: NETWORKBOOSTERS_TIMELINE
+    update: true
+    slots:
+      - 10-16
+      - 19-25
+      - 28-34
+    item:
+      material: CLOCK
+      name:
+        default: "<aqua><bold>%booster_name%"
+        locales:
+          es: "<aqua><bold>%booster_name%"
+          en: "<aqua><bold>%booster_name%"
+      lore:
+        default:
+          - "<gray>State: <white>%timeline_state%</white>"
+          - "<gray>Group: <white>%timeline_group%</white>"
+          - "<gray>Position: <white>%timeline_position%</white>"
+          - "<gray>Multiplier: <aqua>x%timeline_multiplier%</aqua>"
+          - "<gray>Duration: <white>%timeline_duration%</white>"
+          - "<gray>Starts in: <white>%timeline_starts%</white>"
+          - "<gray>Ends in: <white>%timeline_remaining%</white>"
+          - "<gray>Modalities: <white>%modalities%</white>"
+        locales:
+          es:
+            - "<gray>Estado: <white>%timeline_state%</white>"
+            - "<gray>Grupo: <white>%timeline_group%</white>"
+            - "<gray>Posición: <white>%timeline_position%</white>"
+            - "<gray>Multiplicador: <aqua>x%timeline_multiplier%</aqua>"
+            - "<gray>Duración: <white>%timeline_duration%</white>"
+            - "<gray>Comienza en: <white>%timeline_starts%</white>"
+            - "<gray>Finaliza en: <white>%timeline_remaining%</white>"
+            - "<gray>Modalidades: <white>%modalities%</white>"
+          en:
+            - "<gray>State: <white>%timeline_state%</white>"
+            - "<gray>Group: <white>%timeline_group%</white>"
+            - "<gray>Position: <white>%timeline_position%</white>"
+            - "<gray>Multiplier: <aqua>x%timeline_multiplier%</aqua>"
+            - "<gray>Duration: <white>%timeline_duration%</white>"
+            - "<gray>Starts in: <white>%timeline_starts%</white>"
+            - "<gray>Ends in: <white>%timeline_remaining%</white>"
+            - "<gray>Modalities: <white>%modalities%</white>"
+
+  empty-timeline:
+    type: NETWORKBOOSTERS_EMPTY_TIMELINE
+    slot: 22
+    item:
+      material: GRAY_DYE
+      name:
+        default: "<yellow><bold>No active boosters"
+        locales:
+          es: "<yellow><bold>No tenés boosters activos"
+          en: "<yellow><bold>No active boosters"
+      lore:
+        default:
+          - "<gray>Your booster queue is also empty."
+        locales:
+          es:
+            - "<gray>Tu cola de boosters también está vacía."
+          en:
+            - "<gray>Your booster queue is also empty."
+
+  back:
+    type: BACK
+    slot: 49
+    item:
+      material: RED_BUNDLE
+      hide-additional-tooltip: true
+      name:
+        default: "<red>Back"
+        locales:
+          es: "<red>Volver"
+          en: "<red>Back"

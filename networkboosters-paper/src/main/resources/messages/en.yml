@@ -1,4 +1,4 @@
-config-version: 1
+config-version: 2
 
 common:
   prefix: "<dark_gray>[<aqua>Boosters</aqua><dark_gray>]"
@@ -34,6 +34,14 @@ summary:
   claims: "<gray>Pending rewards: <white><amount></white>"
   hint: "<dark_gray>Use <gray>/boosters list</gray> to view your boosters."
 
+scope:
+  all-modalities: "All"
+
+status:
+  none: "None"
+  active: "Active"
+  queued: "Queued"
+
 list:
   header: "<aqua>Your boosters <dark_gray>(page <page>/<pages>)"
   entry: "<gray>- <name> <dark_gray>(<id>)</dark_gray> <white>x<amount></white> <dark_gray>|</dark_gray> <aqua>x<multiplier></aqua> <dark_gray>|</dark_gray> <gray><duration>"
@@ -58,6 +66,7 @@ claims:
   not-found: "<red>That claim does not exist."
   already-claimed: "<yellow>That claim was already claimed."
   inventory-full: "<red>Your inventory does not have enough space for that claim."
+  received: "<gold>You received a pending reward: <name> x<amount>. <yellow>Claim it from /boosters claims when you have room."
 
 activation:
   activated: "<green>Activated <name>. Remaining inventory: <amount>."
@@ -129,9 +138,11 @@ admin:
     - "<gray>Inventory detail: <white><inventory_breakdown></white>"
     - "<gray>Active detail: <white><active_breakdown></white>"
     - "<gray>Queue detail: <white><queue_breakdown></white>"
+    - "<gray>Claims detail: <white><claims_breakdown></white>"
     - "<gray>Redis: <white><redis></white>"
   deactivated-all: "<green>Requested deactivation for <amount> active booster(s)."
   target-not-ready: "<yellow>The target player is not ready."
+  claim-created: "<green>Created claim <white><claim></white> for <player>: <name> x<amount>."
 
 placeholder:
   true: "true"

@@ -13,7 +13,10 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class NetworkBoostersConfigurationTest {
 
@@ -36,6 +39,7 @@ class NetworkBoostersConfigurationTest {
         assertEquals(Duration.ofMinutes(5), config.activation().expiryWarnings().getFirst());
         assertEquals(30, config.inventoryLimits().fallback());
         assertEquals(2, config.inventoryLimits().tiers().size());
+        assertEquals("SkyWars", config.scopeDisplay().game("skywars").orElseThrow());
         assertEquals("boosters", config.commands().root());
         assertTrue(config.placeholderApi().enabled());
     }
@@ -43,7 +47,7 @@ class NetworkBoostersConfigurationTest {
     @Test
     void rejectsUnsupportedVersionAndKeepsAllIssues() throws IOException {
         ConfigurationException exception = assertThrows(ConfigurationException.class, () -> NetworkBoostersConfiguration.load(document("""
-            config-version: 2
+            config-version: 3
             server:
               id: test-01
               game-id: skywars
@@ -109,11 +113,31 @@ class NetworkBoostersConfigurationTest {
         assertThrows(UnsupportedOperationException.class, () -> config.commands().aliases().add("other"));
         assertThrows(UnsupportedOperationException.class, () -> config.activation().expiryWarnings().add(Duration.ofSeconds(1)));
         assertThrows(UnsupportedOperationException.class, () -> config.inventoryLimits().tiers().clear());
+        assertThrows(UnsupportedOperationException.class, () -> config.scopeDisplay().games().clear());
+    }
+
+    @Test
+    void upgradesVersionOneConfigurationWithScopeDisplay(@TempDir Path tempDir) throws IOException {
+        Path file = tempDir.resolve("config.yml");
+        Files.writeString(file, validConfig()
+            .replace("config-version: 2", "config-version: 1")
+            .replace("scope-display:\n  games:\n    skywars: SkyWars\n", ""));
+        try (var defaults = NetworkBoostersConfigurationTest.class.getClassLoader().getResourceAsStream("config.yml")) {
+            YamlDocument updated = YamlDocument.create(
+                file.toFile(),
+                defaults,
+                LoaderSettings.builder().setAutoUpdate(true).setAllowDuplicateKeys(false).build(),
+                UpdaterSettings.builder().setVersioning(new BasicVersioning("config-version")).build()
+            );
+
+            assertEquals(2, updated.getInt("config-version"));
+            assertEquals("Development", updated.getString("scope-display.games.development"));
+        }
     }
 
     static String validConfig() {
         return """
-            config-version: 1
+            config-version: 2
             server:
               id: test-01
               game-id: skywars
@@ -169,6 +193,9 @@ class NetworkBoostersConfigurationTest {
                   permission: networkboosters.capacity.legend
                   maximum: 100
                   priority: 200
+            scope-display:
+              games:
+                skywars: SkyWars
             localization:
               fallback-language: en
               console-language: en

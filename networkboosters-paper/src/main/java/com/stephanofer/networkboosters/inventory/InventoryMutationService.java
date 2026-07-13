@@ -7,6 +7,7 @@ import com.stephanofer.networkboosters.api.player.BoosterClaim;
 import com.stephanofer.networkboosters.api.player.ClaimStatus;
 import com.stephanofer.networkboosters.api.player.PlayerBoostSnapshot;
 import com.stephanofer.networkboosters.api.request.ClaimRequest;
+import com.stephanofer.networkboosters.api.request.ClaimCreationRequest;
 import com.stephanofer.networkboosters.api.request.InventoryGrantRequest;
 import com.stephanofer.networkboosters.api.request.InventoryRevokeRequest;
 import com.stephanofer.networkboosters.api.request.InventorySetRequest;
@@ -141,6 +142,62 @@ public final class InventoryMutationService {
                 );
                 return new ClaimResult(ClaimResultStatus.SERVICE_UNAVAILABLE, Optional.empty(), 0);
             });
+    }
+
+    public CompletableFuture<InventoryMutationResult> createClaim(ClaimCreationRequest request) {
+        Objects.requireNonNull(request, "request");
+        if (!this.snapshots.isReady(request.playerId())) {
+            return CompletableFuture.completedFuture(result(InventoryMutationStatus.PLAYER_NOT_READY, request.boosterId(), 0, 0));
+        }
+        if (this.definition(request.boosterId()).isEmpty()) {
+            return CompletableFuture.completedFuture(result(InventoryMutationStatus.DEFINITION_NOT_FOUND, request.boosterId(), 0, 0));
+        }
+        return this.storage.write(connection -> this.createClaim(connection, request))
+            .thenApply(this::publishInventoryResult)
+            .exceptionally(failure -> {
+                this.logInventoryFailure("create-claim", request.playerId(), request.boosterId(), request.amount(), request.source().name(), failure);
+                return result(InventoryMutationStatus.SERVICE_UNAVAILABLE, request.boosterId(), 0, 0);
+            });
+    }
+
+    private MutationOutcome<InventoryMutationResult> createClaim(Connection connection, ClaimCreationRequest request) throws SQLException {
+        this.storage.revisions().revisionForUpdate(connection, request.playerId());
+        long inventoryAmount = this.amount(connection, request.playerId(), request.boosterId());
+        UUID claimId = UUID.randomUUID();
+        BoosterClaim claim = this.storage.claims().insert(
+            connection,
+            claimId,
+            request.playerId(),
+            request.boosterId(),
+            request.amount(),
+            request.source(),
+            request.sourceReference(),
+            currentDatabaseTime(connection)
+        );
+        long revision = this.storage.revisions().increment(connection, request.playerId());
+        this.audit(
+            connection,
+            UUID.randomUUID(),
+            "CLAIM_CREATED",
+            request.playerId(),
+            request.boosterId(),
+            request.amount(),
+            inventoryAmount,
+            inventoryAmount,
+            Optional.of(claimId),
+            request.sourceReference().actorId().isPresent() ? "PLAYER" : "CONSOLE",
+            request.source().name(),
+            request.sourceReference(),
+            InventoryMutationStatus.CLAIM_CREATED.name()
+        );
+        PlayerBoostSnapshot snapshot = this.storage.playerStates().loadSnapshot(connection, request.playerId());
+        if (snapshot.revision() != revision) {
+            throw new SQLException("Snapshot revision mismatch after claim creation for " + request.playerId());
+        }
+        return new MutationOutcome<>(
+            new InventoryMutationResult(InventoryMutationStatus.CLAIM_CREATED, request.boosterId(), inventoryAmount, inventoryAmount, Optional.of(claim)),
+            Optional.of(snapshot)
+        );
     }
 
     private MutationOutcome<InventoryMutationResult> grant(
@@ -442,7 +499,7 @@ public final class InventoryMutationService {
         outcome.snapshot().ifPresent(snapshot -> {
             InventoryMutationResult result = outcome.result();
             PostCommitChange change = result.status() == InventoryMutationStatus.CLAIM_CREATED
-                ? new PostCommitChange.StateChanged(snapshot, BoosterChangeType.INVENTORY_CHANGED, result.claim().map(BoosterClaim::claimId))
+                ? new PostCommitChange.ClaimCreated(snapshot, result.claim().orElseThrow())
                 : new PostCommitChange.InventoryChanged(
                     snapshot,
                     result.boosterId(),
@@ -591,16 +648,11 @@ public final class InventoryMutationService {
         return source == MutationSource.ADMIN_COMMAND ? "CONSOLE" : "SYSTEM";
     }
 
-    private static Optional<ClaimSource> claimSource(MutationSource source) {
+    static Optional<ClaimSource> claimSource(MutationSource source) {
         return switch (source) {
             case PURCHASE -> Optional.of(ClaimSource.PURCHASE);
-            case CRATE -> Optional.of(ClaimSource.CRATE);
-            case BATTLE_PASS -> Optional.of(ClaimSource.BATTLE_PASS);
-            case EVENT -> Optional.of(ClaimSource.EVENT);
-            case DAILY_REWARD -> Optional.of(ClaimSource.DAILY_REWARD);
             case COMPENSATION -> Optional.of(ClaimSource.COMPENSATION);
-            case SYSTEM -> Optional.of(ClaimSource.SYSTEM);
-            case ADMIN_COMMAND -> Optional.empty();
+            case ADMIN_COMMAND, CRATE, BATTLE_PASS, EVENT, DAILY_REWARD, SYSTEM -> Optional.empty();
         };
     }
 

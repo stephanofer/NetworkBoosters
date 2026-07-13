@@ -6,12 +6,14 @@ import com.stephanofer.networkboosters.menu.button.ActivationPreviewButton;
 import com.stephanofer.networkboosters.menu.button.ClaimsEmptyStateButton;
 import com.stephanofer.networkboosters.menu.button.FilterButton;
 import com.stephanofer.networkboosters.menu.button.MenuSummaryButton;
+import com.stephanofer.networkboosters.menu.button.BoosterStatusButton;
 import com.stephanofer.networkboosters.menu.button.OpenClaimsButton;
 import com.stephanofer.networkboosters.menu.button.OwnedEmptyStateButton;
 import com.stephanofer.networkboosters.menu.button.SortButton;
 import com.stephanofer.networkboosters.menu.button.TransferAmountButton;
 import com.stephanofer.networkboosters.menu.button.TransferConfirmButton;
 import com.stephanofer.networkboosters.menu.button.TransferPreviewButton;
+import com.stephanofer.networkboosters.menu.button.TimelineEmptyStateButton;
 import fr.maxlego08.menu.api.button.Button;
 import fr.maxlego08.menu.api.button.DefaultButtonValue;
 import fr.maxlego08.menu.api.loader.ButtonLoader;
@@ -34,6 +36,14 @@ public final class SimpleMenuButtonLoader extends ButtonLoader {
 
     public static SimpleMenuButtonLoader summary(Plugin plugin, NetworkBoostersMenuCoordinator coordinator) {
         return new SimpleMenuButtonLoader(plugin, "NETWORKBOOSTERS_SUMMARY", coordinator, (menu, ignored, path) -> new MenuSummaryButton(menu));
+    }
+
+    public static SimpleMenuButtonLoader status(Plugin plugin, NetworkBoostersMenuCoordinator coordinator) {
+        return new SimpleMenuButtonLoader(plugin, "NETWORKBOOSTERS_STATUS", coordinator, (menu, ignored, path) -> new BoosterStatusButton(menu));
+    }
+
+    public static SimpleMenuButtonLoader timelineEmpty(Plugin plugin, NetworkBoostersMenuCoordinator coordinator) {
+        return new SimpleMenuButtonLoader(plugin, "NETWORKBOOSTERS_EMPTY_TIMELINE", coordinator, (menu, ignored, path) -> new TimelineEmptyStateButton(menu));
     }
 
     public static SimpleMenuButtonLoader filter(Plugin plugin, NetworkBoostersMenuCoordinator coordinator) {

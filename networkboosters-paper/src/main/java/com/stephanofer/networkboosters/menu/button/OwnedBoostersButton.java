@@ -26,19 +26,18 @@ public final class OwnedBoostersButton extends PaginateButton {
         for (int slot : this.getSlots()) {
             inventoryEngine.removeItem(slot);
         }
-        List<OwnedBoosterView> views = this.coordinator.views(player);
+        int page = Math.max(1, inventoryEngine.getPage());
+        List<OwnedBoosterView> views = this.coordinator.pageViews(player, page, this.getSlots().size());
         if (views.isEmpty()) {
             return;
         }
-        int page = Math.max(0, inventoryEngine.getPage() - 1);
         ArrayList<Integer> slots = new ArrayList<>(this.getSlots());
-        int start = page * slots.size();
-        int end = Math.min(views.size(), start + slots.size());
-        for (int index = start; index < end; index++) {
+        for (int index = 0; index < views.size(); index++) {
             OwnedBoosterView view = views.get(index);
-            int slot = slots.get(index - start);
+            int slot = slots.get(index);
             Placeholders placeholders = this.coordinator.boosterPlaceholders(player, view);
             ItemStack itemStack = this.coordinator.applyDisplay(view, this.getCustomItemStack(player, false, placeholders));
+            itemStack.setAmount(1);
             var itemButton = inventoryEngine.addItem(slot, itemStack);
             if (itemButton != null) {
                 itemButton.setClick(event -> this.click(player, event, inventoryEngine, view));
@@ -48,7 +47,7 @@ public final class OwnedBoostersButton extends PaginateButton {
 
     @Override
     public int getPaginationSize(@NonNull Player player) {
-        return this.coordinator.views(player).size();
+        return this.coordinator.visibleUnitCount(player);
     }
 
     private void click(Player player, InventoryClickEvent event, InventoryEngine inventory, OwnedBoosterView view) {
@@ -57,12 +56,7 @@ public final class OwnedBoostersButton extends PaginateButton {
             this.coordinator.update(player);
             return;
         }
-        if (event.isRightClick()) {
-            if (view.transferable()) {
-                this.coordinator.beginTransfer(player, view.boosterId(), inventory.getPage());
-            } else {
-                this.coordinator.update(player);
-            }
+        if (!event.isLeftClick()) {
             return;
         }
         this.coordinator.beginActivation(player, view.boosterId(), inventory.getPage());

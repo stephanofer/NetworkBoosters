@@ -1,4 +1,4 @@
-config-version: 1
+config-version: 2
 
 common:
   prefix: "<dark_gray>[<aqua>Boosters</aqua><dark_gray>]"
@@ -34,6 +34,14 @@ summary:
   claims: "<gray>Recompensas pendientes: <white><amount></white>"
   hint: "<dark_gray>Usá <gray>/boosters list</gray> para ver tus boosters."
 
+scope:
+  all-modalities: "Todas"
+
+status:
+  none: "Ninguno"
+  active: "Activo"
+  queued: "En cola"
+
 list:
   header: "<aqua>Tus boosters <dark_gray>(página <page>/<pages>)"
   entry: "<gray>- <name> <dark_gray>(<id>)</dark_gray> <white>x<amount></white> <dark_gray>|</dark_gray> <aqua>x<multiplier></aqua> <dark_gray>|</dark_gray> <gray><duration>"
@@ -58,6 +66,7 @@ claims:
   not-found: "<red>Esa recompensa no existe."
   already-claimed: "<yellow>Esa recompensa ya fue reclamada."
   inventory-full: "<red>Tu inventario no tiene espacio suficiente para esa recompensa."
+  received: "<gold>Recibiste una recompensa pendiente: <name> x<amount>. <yellow>Reclamala desde /boosters claims cuando tengas espacio."
 
 activation:
   activated: "<green>Activaste <name>. Inventario restante: <amount>."
@@ -129,9 +138,11 @@ admin:
     - "<gray>Inventario detalle: <white><inventory_breakdown></white>"
     - "<gray>Activos detalle: <white><active_breakdown></white>"
     - "<gray>Cola detalle: <white><queue_breakdown></white>"
+    - "<gray>Claims detalle: <white><claims_breakdown></white>"
     - "<gray>Redis: <white><redis></white>"
   deactivated-all: "<green>Solicitaste desactivar <amount> booster(s) activo(s)."
   target-not-ready: "<yellow>El jugador objetivo todavía no está listo."
+  claim-created: "<green>Creaste el claim <white><claim></white> para <player>: <name> x<amount>."
 
 placeholder:
   true: "true"

@@ -72,24 +72,24 @@ public final class InventoryRepository {
             throw new IllegalArgumentException("amount must be positive");
         }
         try (PreparedStatement statement = connection.prepareStatement(
-            "UPDATE " + this.table + " SET amount = amount - ? WHERE player_uuid = ? AND booster_id = ? AND amount >= ?"
+            "UPDATE " + this.table + " SET amount = amount - ? WHERE player_uuid = ? AND booster_id = ? AND amount > ?"
         )) {
             statement.setLong(1, amount);
             JdbcUuid.set(statement, 2, playerId);
             statement.setString(3, boosterId.value());
             statement.setLong(4, amount);
-            if (statement.executeUpdate() != 1) {
-                return false;
+            if (statement.executeUpdate() == 1) {
+                return true;
             }
         }
         try (PreparedStatement statement = connection.prepareStatement(
-            "DELETE FROM " + this.table + " WHERE player_uuid = ? AND booster_id = ? AND amount = 0"
+            "DELETE FROM " + this.table + " WHERE player_uuid = ? AND booster_id = ? AND amount = ?"
         )) {
             JdbcUuid.set(statement, 1, playerId);
             statement.setString(2, boosterId.value());
-            statement.executeUpdate();
+            statement.setLong(3, amount);
+            return statement.executeUpdate() == 1;
         }
-        return true;
     }
 
     public void add(Connection connection, UUID playerId, BoosterId boosterId, long amount) throws SQLException {

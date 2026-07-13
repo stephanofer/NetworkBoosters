@@ -7,6 +7,7 @@ import java.util.Objects;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -50,5 +51,16 @@ public final class LocalizationService {
             .map(MessageCatalog.BoosterTranslation::name)
             .orElse(boosterId);
         return this.miniMessage.deserialize(value);
+    }
+
+    public String boosterNameTemplate(CommandSender sender, String boosterId) {
+        String language = this.language(sender);
+        return this.configurationStore.requireCurrent().localization().catalog(language).booster(boosterId)
+            .map(MessageCatalog.BoosterTranslation::name)
+            .orElse(boosterId);
+    }
+
+    public String plainMessage(CommandSender sender, MessageKey key) {
+        return PlainTextComponentSerializer.plainText().serialize(this.message(sender, key));
     }
 }

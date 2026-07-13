@@ -20,6 +20,11 @@ public final class OwnedEmptyStateButton extends Button {
     }
 
     @Override
+    public boolean hasCustomRender() {
+        return true;
+    }
+
+    @Override
     public void onRender(Player player, InventoryEngine inventoryEngine) {
         boolean show = switch (this.reason) {
             case NO_INVENTORY -> !this.coordinator.hasOwnedBoosters(player);
