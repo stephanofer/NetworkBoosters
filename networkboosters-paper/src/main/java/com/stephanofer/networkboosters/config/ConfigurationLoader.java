@@ -37,6 +37,18 @@ public final class ConfigurationLoader {
         return this.load((ConfigurationSnapshot) null);
     }
 
+    public NetworkBoostersConfiguration.Commands loadBootstrapCommands() {
+        List<ConfigurationIssue> issues = new ArrayList<>();
+        NetworkBoostersConfiguration.Commands commands = this.loadBootstrapCommands(issues);
+        List<ConfigurationIssue> errors = issues.stream()
+            .filter(issue -> issue.severity() == ConfigurationIssue.Severity.ERROR)
+            .toList();
+        if (!errors.isEmpty()) {
+            throw new ConfigurationException(issues);
+        }
+        return commands;
+    }
+
     public ConfigurationSnapshot load(ConfigurationSnapshot previous) {
         BoosterDefinitionRegistry previousDefinitions = previous == null
             ? BoosterDefinitionRegistry.empty()
@@ -80,6 +92,34 @@ public final class ConfigurationLoader {
             .filter(issue -> issue.severity() == ConfigurationIssue.Severity.WARNING)
             .toList();
         return new ConfigurationSnapshot(0, configuration, definitions, localization, changes, configurationChanges, warnings);
+    }
+
+    private NetworkBoostersConfiguration.Commands loadBootstrapCommands(List<ConfigurationIssue> issues) {
+        File configFile = new File(this.dataFolder, CONFIG_RESOURCE);
+        try {
+            Files.createDirectories(this.dataFolder.toPath());
+        } catch (IOException exception) {
+            issues.add(ConfigurationIssue.error(CONFIG_RESOURCE, "$", "Failed to prepare config.yml: " + exception.getMessage()));
+            return null;
+        }
+        try (InputStream defaults = this.requiredResource(CONFIG_RESOURCE)) {
+            YamlDocument document = YamlDocument.create(
+                configFile,
+                defaults,
+                LoaderSettings.builder()
+                    .setAutoUpdate(true)
+                    .setAllowDuplicateKeys(false)
+                    .setErrorLabel("NetworkBoosters config.yml")
+                    .build(),
+                UpdaterSettings.builder()
+                    .setVersioning(new BasicVersioning("config-version"))
+                    .build()
+            );
+            return NetworkBoostersConfiguration.parseCommands(document, issues);
+        } catch (IOException | RuntimeException exception) {
+            issues.add(ConfigurationIssue.error(CONFIG_RESOURCE, "$", "Failed to load command configuration: " + exception.getMessage()));
+            return null;
+        }
     }
 
     private NetworkBoostersConfiguration loadGlobalConfiguration(List<ConfigurationIssue> issues) {

@@ -18,7 +18,7 @@ dependencies:
       join-classpath: true
     zMenu:
       load: BEFORE
-      required: false
+      required: true
       join-classpath: true
     PlaceholderAPI:
       load: BEFORE

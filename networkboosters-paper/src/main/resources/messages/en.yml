@@ -75,6 +75,8 @@ activation:
   queue-limit: "<red>Your booster queue is full."
   duration-limit: "<red>That activation would exceed the maximum queued duration."
   player-not-ready: "<yellow>Your boosters are still loading."
+  expiry-warning: "<yellow><name> <gray>x<multiplier></gray> expires in <white><remaining></white>."
+  expired: "<yellow><name> expired."
 
 inventory:
   granted: "<green>Granted <name> x<amount>. New amount: <new>."
@@ -121,9 +123,12 @@ admin:
     - "<gray>Settings ready: <white><settings_ready></white>"
     - "<gray>Boosters ready: <white><boosters_ready></white>"
     - "<gray>Local revision: <white><local_revision></white>"
-    - "<gray>Persisted revision: <white><persisted_revision></white>"
+    - "<gray>Persisted revision: <white><persisted_revision></white> <dark_gray>(<revision_state>)</dark_gray>"
     - "<gray>Inventory: <white><used></white>/<white><capacity></white> <dark_gray>(<capacity_rule>)</dark_gray>"
     - "<gray>Active: <white><active></white> Queue: <white><queued></white> Claims: <white><claims></white>"
+    - "<gray>Inventory detail: <white><inventory_breakdown></white>"
+    - "<gray>Active detail: <white><active_breakdown></white>"
+    - "<gray>Queue detail: <white><queue_breakdown></white>"
     - "<gray>Redis: <white><redis></white>"
   deactivated-all: "<green>Requested deactivation for <amount> active booster(s)."
   target-not-ready: "<yellow>The target player is not ready."

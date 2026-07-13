@@ -14,20 +14,18 @@ import org.jspecify.annotations.NonNull;
 public final class ClaimsButton extends PaginateButton {
 
     private final NetworkBoostersMenuCoordinator coordinator;
-    private final int emptySlot;
 
-    public ClaimsButton(NetworkBoostersMenuCoordinator coordinator, int emptySlot) {
+    public ClaimsButton(NetworkBoostersMenuCoordinator coordinator) {
         this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
-        this.emptySlot = emptySlot;
     }
 
     @Override
     public void onRender(Player player, InventoryEngine inventoryEngine) {
+        for (int slot : this.getSlots()) {
+            inventoryEngine.removeItem(slot);
+        }
         List<BoosterClaim> claims = playerClaims(player);
         if (claims.isEmpty()) {
-            if (this.emptySlot >= 0) {
-                inventoryEngine.addItem(this.emptySlot, this.getCustomItemStack(player, false, this.coordinator.basePlaceholders(player)));
-            }
             return;
         }
         ArrayList<Integer> slots = new ArrayList<>(this.getSlots());

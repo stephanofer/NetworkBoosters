@@ -111,6 +111,12 @@ public record NetworkBoostersConfiguration(
         );
     }
 
+    public static Commands parseCommands(YamlDocument config, List<ConfigurationIssue> issues) {
+        Objects.requireNonNull(config, "config");
+        Objects.requireNonNull(issues, "issues");
+        return parseCommands(requiredSection(config, "commands", issues), issues);
+    }
+
     public record Storage(
         String host,
         int port,

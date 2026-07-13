@@ -104,23 +104,79 @@ public final class NetworkBoostersCommands {
         manager.command(manager.commandBuilder(root).permission("networkboosters.command.open").handler(context -> this.openOrSummary(context.sender().getSender())));
         manager.command(manager.commandBuilder(root).literal("help").permission("networkboosters.command.open").handler(context -> this.help(context.sender().getSender())));
         manager.command(manager.commandBuilder(root).literal("menu").permission("networkboosters.command.open").handler(context -> this.openOrSummary(context.sender().getSender())));
-        manager.command(manager.commandBuilder(root).literal("list").optional("page", stringParser()).permission("networkboosters.command.list").handler(context -> this.list(context.sender().getSender(), context.getOrDefault("page", "1"))));
+        manager.command(manager.commandBuilder(root).literal("list").optional("page", stringParser(), this.listPages()).permission("networkboosters.command.list").handler(context -> this.list(context.sender().getSender(), context.getOrDefault("page", "1"))));
         manager.command(manager.commandBuilder(root).literal("active").permission("networkboosters.command.list").handler(context -> this.active(context.sender().getSender())));
-        manager.command(manager.commandBuilder(root).literal("queue").optional("group", stringParser()).permission("networkboosters.command.list").handler(context -> this.queue(context.sender().getSender(), context.getOrDefault("group", ""))));
-        manager.command(manager.commandBuilder(root).literal("claims").optional("page", stringParser()).permission("networkboosters.command.claims").handler(context -> this.claims(context.sender().getSender(), context.getOrDefault("page", "1"))));
-        manager.command(manager.commandBuilder(root).literal("claim").required("claim", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-claims")).permission("networkboosters.command.claims").handler(context -> this.claim(context.sender().getSender(), context.get("claim"))));
-        manager.command(manager.commandBuilder(root).literal("activate").required("booster", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-owned")).permission("networkboosters.command.activate").handler(context -> this.activate(context.sender().getSender(), context.get("booster"))));
-        manager.command(manager.commandBuilder(root).literal("transfer").required("player", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-online-players")).required("booster", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-transferable")).optional("amount", stringParser()).permission("networkboosters.command.transfer").handler(context -> this.transfer(context.sender().getSender(), context.get("player"), context.get("booster"), context.getOrDefault("amount", "1"))));
+        manager.command(manager.commandBuilder(root).literal("queue").optional("group", stringParser(), this.queueGroups()).permission("networkboosters.command.list").handler(context -> this.queue(context.sender().getSender(), context.getOrDefault("group", ""))));
+        manager.command(manager.commandBuilder(root).literal("claims").optional("page", stringParser(), this.claimPages()).permission("networkboosters.command.claims").handler(context -> this.claims(context.sender().getSender(), context.getOrDefault("page", "1"))));
+        manager.command(manager.commandBuilder(root).literal("claim").required("claim", stringParser(), this.claims()).permission("networkboosters.command.claims").handler(context -> this.claim(context.sender().getSender(), context.get("claim"))));
+        manager.command(manager.commandBuilder(root).literal("activate").required("booster", stringParser(), this.ownedBoosters()).permission("networkboosters.command.activate").handler(context -> this.activate(context.sender().getSender(), context.get("booster"))));
+        manager.command(manager.commandBuilder(root).literal("transfer").required("player", stringParser(), this.transferTargets()).required("booster", stringParser(), this.transferableBoosters()).optional("amount", stringParser(), this.transferAmounts()).permission("networkboosters.command.transfer").handler(context -> this.transfer(context.sender().getSender(), context.get("player"), context.get("booster"), context.getOrDefault("amount", "1"))));
 
-        manager.command(manager.commandBuilder(root).literal("admin").literal("give").required("player", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-online-players")).required("booster", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-definitions")).optional("amount", stringParser()).permission("networkboosters.admin.give").handler(context -> this.adminGive(context.sender().getSender(), context.get("player"), context.get("booster"), context.getOrDefault("amount", "1"), false)));
-        manager.command(manager.commandBuilder(root).literal("admin").literal("give").required("player", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-online-players")).required("booster", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-definitions")).required("amount", stringParser()).literal("--force").permission("networkboosters.admin.give.force").handler(context -> this.adminGive(context.sender().getSender(), context.get("player"), context.get("booster"), context.get("amount"), true)));
-        manager.command(manager.commandBuilder(root).literal("admin").literal("take").required("player", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-online-players")).required("booster", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-definitions")).optional("amount", stringParser()).permission("networkboosters.admin.take").handler(context -> this.adminTake(context.sender().getSender(), context.get("player"), context.get("booster"), context.getOrDefault("amount", "1"))));
-        manager.command(manager.commandBuilder(root).literal("admin").literal("set").required("player", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-online-players")).required("booster", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-definitions")).required("amount", stringParser()).permission("networkboosters.admin.set").handler(context -> this.adminSet(context.sender().getSender(), context.get("player"), context.get("booster"), context.get("amount"), false)));
-        manager.command(manager.commandBuilder(root).literal("admin").literal("set").required("player", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-online-players")).required("booster", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-definitions")).required("amount", stringParser()).literal("--force").permission("networkboosters.admin.give.force").handler(context -> this.adminSet(context.sender().getSender(), context.get("player"), context.get("booster"), context.get("amount"), true)));
-        manager.command(manager.commandBuilder(root).literal("admin").literal("activate").required("player", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-online-players")).required("booster", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-definitions")).permission("networkboosters.admin.activate").handler(context -> this.adminActivate(context.sender().getSender(), context.get("player"), context.get("booster"))));
-        manager.command(manager.commandBuilder(root).literal("admin").literal("deactivate").required("player", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-online-players")).required("activation", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-activations")).permission("networkboosters.admin.deactivate").handler(context -> this.adminDeactivate(context.sender().getSender(), context.get("player"), context.get("activation"))));
-        manager.command(manager.commandBuilder(root).literal("admin").literal("inspect").required("player", stringParser(), SuggestionProvider.suggestingStrings("networkboosters-online-players")).permission("networkboosters.admin.inspect").handler(context -> this.inspect(context.sender().getSender(), context.get("player"))));
+        manager.command(manager.commandBuilder(root).literal("admin").literal("give").required("player", stringParser(), this.onlinePlayers()).required("booster", stringParser(), this.definitions()).optional("amount", stringParser(), this.commonAmounts()).permission("networkboosters.admin.give").handler(context -> this.adminGive(context.sender().getSender(), context.get("player"), context.get("booster"), context.getOrDefault("amount", "1"), false)));
+        manager.command(manager.commandBuilder(root).literal("admin").literal("give").required("player", stringParser(), this.onlinePlayers()).required("booster", stringParser(), this.definitions()).required("amount", stringParser(), this.commonAmounts()).literal("--force").permission("networkboosters.admin.give.force").handler(context -> this.adminGive(context.sender().getSender(), context.get("player"), context.get("booster"), context.get("amount"), true)));
+        manager.command(manager.commandBuilder(root).literal("admin").literal("take").required("player", stringParser(), this.onlinePlayers()).required("booster", stringParser(), this.definitions()).optional("amount", stringParser(), this.adminTakeAmounts()).permission("networkboosters.admin.take").handler(context -> this.adminTake(context.sender().getSender(), context.get("player"), context.get("booster"), context.getOrDefault("amount", "1"))));
+        manager.command(manager.commandBuilder(root).literal("admin").literal("set").required("player", stringParser(), this.onlinePlayers()).required("booster", stringParser(), this.definitions()).required("amount", stringParser(), this.adminSetAmounts()).permission("networkboosters.admin.set").handler(context -> this.adminSet(context.sender().getSender(), context.get("player"), context.get("booster"), context.get("amount"), false)));
+        manager.command(manager.commandBuilder(root).literal("admin").literal("set").required("player", stringParser(), this.onlinePlayers()).required("booster", stringParser(), this.definitions()).required("amount", stringParser(), this.adminSetAmounts()).literal("--force").permission("networkboosters.admin.give.force").handler(context -> this.adminSet(context.sender().getSender(), context.get("player"), context.get("booster"), context.get("amount"), true)));
+        manager.command(manager.commandBuilder(root).literal("admin").literal("activate").required("player", stringParser(), this.onlinePlayers()).required("booster", stringParser(), this.definitions()).permission("networkboosters.admin.activate").handler(context -> this.adminActivate(context.sender().getSender(), context.get("player"), context.get("booster"))));
+        manager.command(manager.commandBuilder(root).literal("admin").literal("deactivate").required("player", stringParser(), this.onlinePlayers()).required("activation", stringParser(), this.activations()).permission("networkboosters.admin.deactivate").handler(context -> this.adminDeactivate(context.sender().getSender(), context.get("player"), context.get("activation"))));
+        manager.command(manager.commandBuilder(root).literal("admin").literal("inspect").required("player", stringParser(), this.onlinePlayers()).permission("networkboosters.admin.inspect").handler(context -> this.inspect(context.sender().getSender(), context.get("player"))));
         manager.command(manager.commandBuilder(root).literal("admin").literal("reload").permission("networkboosters.admin.reload").handler(context -> this.reload(context.sender().getSender())));
+    }
+
+    private SuggestionProvider<CommandSourceStack> onlinePlayers() {
+        return (context, input) -> suggestions(this.suggestOnlinePlayers(input.peekString()));
+    }
+
+    private SuggestionProvider<CommandSourceStack> transferTargets() {
+        return (context, input) -> suggestions(this.suggestTransferTargets(context.sender().getSender(), input.peekString()));
+    }
+
+    private SuggestionProvider<CommandSourceStack> definitions() {
+        return (context, input) -> suggestions(this.suggestDefinitions(input.peekString()));
+    }
+
+    private SuggestionProvider<CommandSourceStack> ownedBoosters() {
+        return (context, input) -> suggestions(this.suggestOwnedBoosters(context.sender().getSender(), input.peekString()));
+    }
+
+    private SuggestionProvider<CommandSourceStack> transferableBoosters() {
+        return (context, input) -> suggestions(this.suggestTransferableBoosters(context.sender().getSender(), input.peekString()));
+    }
+
+    private SuggestionProvider<CommandSourceStack> claims() {
+        return (context, input) -> suggestions(this.suggestClaims(context.sender().getSender(), input.peekString()));
+    }
+
+    private SuggestionProvider<CommandSourceStack> activations() {
+        return (context, input) -> suggestions(this.suggestActivations(context.getOrDefault("player", ""), input.peekString()));
+    }
+
+    private SuggestionProvider<CommandSourceStack> listPages() {
+        return (context, input) -> suggestions(this.suggestListPages(context.sender().getSender(), input.peekString()));
+    }
+
+    private SuggestionProvider<CommandSourceStack> claimPages() {
+        return (context, input) -> suggestions(this.suggestClaimPages(context.sender().getSender(), input.peekString()));
+    }
+
+    private SuggestionProvider<CommandSourceStack> queueGroups() {
+        return (context, input) -> suggestions(this.suggestQueueGroups(context.sender().getSender(), input.peekString()));
+    }
+
+    private SuggestionProvider<CommandSourceStack> transferAmounts() {
+        return (context, input) -> suggestions(this.suggestTransferAmounts(context.sender().getSender(), context.getOrDefault("booster", ""), input.peekString()));
+    }
+
+    private SuggestionProvider<CommandSourceStack> adminTakeAmounts() {
+        return (context, input) -> suggestions(this.suggestAdminTakeAmounts(context.getOrDefault("player", ""), context.getOrDefault("booster", ""), input.peekString()));
+    }
+
+    private SuggestionProvider<CommandSourceStack> adminSetAmounts() {
+        return (context, input) -> suggestions(this.suggestAdminSetAmounts(context.getOrDefault("player", ""), context.getOrDefault("booster", ""), input.peekString()));
+    }
+
+    private SuggestionProvider<CommandSourceStack> commonAmounts() {
+        return (context, input) -> suggestions(suggestCommonAmounts(input.peekString()));
     }
 
     private List<String> suggestOnlinePlayers(String input) {
@@ -133,11 +189,27 @@ public final class NetworkBoostersCommands {
             .orElse(List.of());
     }
 
+    private List<String> suggestTransferTargets(CommandSender sender, String input) {
+        if (!(sender instanceof Player player)) {
+            return List.of();
+        }
+        return this.bridge.runtime()
+            .map(runtime -> runtime.server().getOnlinePlayers().stream()
+                .filter(target -> !target.getUniqueId().equals(player.getUniqueId()))
+                .filter(target -> runtime.service().isReady(target.getUniqueId()))
+                .map(Player::getName)
+                .filter(name -> startsWith(name, input))
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList())
+            .orElse(List.of());
+    }
+
     private List<String> suggestDefinitions(String input) {
         return this.bridge.runtime()
             .map(runtime -> runtime.service().definitions().stream()
                 .map(definition -> definition.id().value())
                 .filter(id -> startsWith(id, input))
+                .sorted(String.CASE_INSENSITIVE_ORDER)
                 .toList())
             .orElse(List.of());
     }
@@ -152,6 +224,7 @@ public final class NetworkBoostersCommands {
                 .filter(entry -> entry.getValue() > 0)
                 .map(entry -> entry.getKey().value())
                 .filter(id -> startsWith(id, input))
+                .sorted(String.CASE_INSENSITIVE_ORDER)
                 .toList())
             .orElse(List.of());
     }
@@ -170,6 +243,7 @@ public final class NetworkBoostersCommands {
                     .orElse(false))
                 .map(BoosterId::value)
                 .filter(id -> startsWith(id, input))
+                .sorted(String.CASE_INSENSITIVE_ORDER)
                 .toList())
             .orElse(List.of());
     }
@@ -189,6 +263,138 @@ public final class NetworkBoostersCommands {
                 .filter(id -> startsWith(id, input))
                 .forEach(suggestions::add));
         return List.copyOf(suggestions);
+    }
+
+    private List<String> suggestListPages(CommandSender sender, String input) {
+        if (!(sender instanceof Player player)) {
+            return List.of();
+        }
+        return this.bridge.runtime()
+            .filter(runtime -> runtime.service().isReady(player.getUniqueId()))
+            .map(runtime -> pageSuggestions(runtime.service().getCachedOrEmpty(player.getUniqueId()).inventory().size(), input))
+            .orElse(List.of());
+    }
+
+    private List<String> suggestClaimPages(CommandSender sender, String input) {
+        if (!(sender instanceof Player player)) {
+            return List.of();
+        }
+        return this.bridge.runtime()
+            .filter(runtime -> runtime.service().isReady(player.getUniqueId()))
+            .map(runtime -> pageSuggestions(runtime.service().getCachedOrEmpty(player.getUniqueId()).pendingClaims().size(), input))
+            .orElse(List.of());
+    }
+
+    private List<String> suggestQueueGroups(CommandSender sender, String input) {
+        if (!(sender instanceof Player player)) {
+            return List.of();
+        }
+        return this.bridge.runtime()
+            .filter(runtime -> runtime.service().isReady(player.getUniqueId()))
+            .map(runtime -> runtime.service().getCachedOrEmpty(player.getUniqueId()).queuedBoosters().keySet().stream()
+                .map(group -> group.value())
+                .filter(group -> startsWith(group, input))
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList())
+            .orElse(List.of());
+    }
+
+    private List<String> suggestTransferAmounts(CommandSender sender, String rawBooster, String input) {
+        if (!(sender instanceof Player player) || rawBooster == null || rawBooster.isBlank()) {
+            return List.of();
+        }
+        return this.bridge.runtime()
+            .filter(runtime -> runtime.service().isReady(player.getUniqueId()))
+            .map(runtime -> {
+                BoosterId boosterId = parseSuggestionBooster(rawBooster).orElse(null);
+                if (boosterId == null) {
+                    return List.<String>of();
+                }
+                long owned = runtime.service().getCachedOrEmpty(player.getUniqueId()).ownedAmount(boosterId);
+                long maximum = runtime.service().definition(boosterId)
+                    .map(definition -> Math.min(owned, definition.transferPolicy().maximumAmount()))
+                    .orElse(0L);
+                return amountSuggestions(maximum, input);
+            })
+            .orElse(List.of());
+    }
+
+    private List<String> suggestAdminTakeAmounts(String targetName, String rawBooster, String input) {
+        if (targetName == null || targetName.isBlank() || rawBooster == null || rawBooster.isBlank()) {
+            return List.of();
+        }
+        return this.bridge.runtime()
+            .map(runtime -> {
+                Player target = runtime.server().getPlayerExact(targetName);
+                BoosterId boosterId = parseSuggestionBooster(rawBooster).orElse(null);
+                if (target == null || boosterId == null || !runtime.service().isReady(target.getUniqueId())) {
+                    return List.<String>of();
+                }
+                return amountSuggestions(runtime.service().getCachedOrEmpty(target.getUniqueId()).ownedAmount(boosterId), input);
+            })
+            .orElse(List.of());
+    }
+
+    private List<String> suggestAdminSetAmounts(String targetName, String rawBooster, String input) {
+        ArrayList<String> suggestions = new ArrayList<>();
+        if (startsWith("0", input)) {
+            suggestions.add("0");
+        }
+        suggestions.addAll(suggestCommonAmounts(input));
+        if (targetName != null && !targetName.isBlank() && rawBooster != null && !rawBooster.isBlank()) {
+            this.bridge.runtime().ifPresent(runtime -> {
+                Player target = runtime.server().getPlayerExact(targetName);
+                BoosterId boosterId = parseSuggestionBooster(rawBooster).orElse(null);
+                if (target != null && boosterId != null && runtime.service().isReady(target.getUniqueId())) {
+                    String current = String.valueOf(runtime.service().getCachedOrEmpty(target.getUniqueId()).ownedAmount(boosterId));
+                    if (!suggestions.contains(current) && startsWith(current, input)) {
+                        suggestions.add(current);
+                    }
+                }
+            });
+        }
+        return suggestions.stream().distinct().toList();
+    }
+
+    private static List<String> pageSuggestions(int entries, String input) {
+        int pages = Math.max(1, (int) Math.ceil(entries / (double) PAGE_SIZE));
+        ArrayList<String> suggestions = new ArrayList<>();
+        for (int page = 1; page <= pages; page++) {
+            String value = String.valueOf(page);
+            if (startsWith(value, input)) {
+                suggestions.add(value);
+            }
+        }
+        return suggestions;
+    }
+
+    private static List<String> suggestCommonAmounts(String input) {
+        return List.of("1", "5", "10", "32", "64").stream()
+            .filter(value -> startsWith(value, input))
+            .toList();
+    }
+
+    private static List<String> amountSuggestions(long maximum, String input) {
+        if (maximum < 1) {
+            return List.of();
+        }
+        ArrayList<String> suggestions = new ArrayList<>();
+        for (long candidate : List.of(1L, 2L, 5L, 10L, 32L, 64L, maximum)) {
+            long value = Math.min(candidate, maximum);
+            String text = String.valueOf(value);
+            if (!suggestions.contains(text) && startsWith(text, input)) {
+                suggestions.add(text);
+            }
+        }
+        return suggestions;
+    }
+
+    private static Optional<BoosterId> parseSuggestionBooster(String rawBooster) {
+        try {
+            return Optional.of(BoosterId.of(rawBooster));
+        } catch (IllegalArgumentException exception) {
+            return Optional.empty();
+        }
     }
 
     private List<String> suggestActivations(String targetName, String input) {
@@ -554,19 +760,50 @@ public final class NetworkBoostersCommands {
             runtime.persistedRevision(target.getUniqueId()).whenComplete((persisted, failure) -> sync(runtime, sender, () -> {
                 send(sender, runtime, MessageKey.ADMIN_INSPECT_HEADER, MessageArguments.text("player", target.getName()));
                 String persistedText = failure == null ? String.valueOf(persisted) : "unavailable";
+                String revisionState = failure == null && persisted == snapshot.revision() ? "synced" : "stale";
+                if (failure != null) {
+                    revisionState = "unavailable";
+                }
                 long queued = snapshot.queuedBoosters().values().stream().mapToLong(List::size).sum();
+                String inventory = snapshot.inventory().isEmpty()
+                    ? "empty"
+                    : snapshot.inventory().entrySet().stream()
+                        .sorted(java.util.Comparator.comparing(entry -> entry.getKey().value()))
+                        .map(entry -> entry.getKey().value() + " x" + entry.getValue())
+                        .collect(java.util.stream.Collectors.joining(", "));
+                String active = snapshot.activeBoosters().isEmpty()
+                    ? "empty"
+                    : snapshot.activeBoosters().values().stream()
+                        .sorted(java.util.Comparator.comparing(activeBooster -> activeBooster.activationGroup().value()))
+                        .map(activeBooster -> activeBooster.boosterId().value()
+                            + "@" + activeBooster.activationGroup().value()
+                            + " x" + activeBooster.multiplier().toPlainString()
+                            + " expires=" + activeBooster.expiresAt())
+                        .collect(java.util.stream.Collectors.joining(", "));
+                String queue = snapshot.queuedBoosters().isEmpty()
+                    ? "empty"
+                    : snapshot.queuedBoosters().entrySet().stream()
+                        .sorted(java.util.Comparator.comparing(entry -> entry.getKey().value()))
+                        .map(entry -> entry.getKey().value() + "[" + entry.getValue().stream()
+                            .map(queuedBooster -> "#" + queuedBooster.position() + " " + queuedBooster.boosterId().value() + " " + queuedBooster.duration().toMillis() + "ms")
+                            .collect(java.util.stream.Collectors.joining(" -> ")) + "]")
+                        .collect(java.util.stream.Collectors.joining(", "));
                 for (Component line : runtime.localization().lines(sender, MessageKey.ADMIN_INSPECT_BODY,
                     MessageArguments.text("online", target.isOnline()),
                     MessageArguments.text("settings_ready", runtime.playerSettings().isReady(target.getUniqueId())),
                     MessageArguments.text("boosters_ready", runtime.service().isReady(target.getUniqueId())),
                     MessageArguments.text("local_revision", snapshot.revision()),
                     MessageArguments.text("persisted_revision", persistedText),
+                    MessageArguments.text("revision_state", revisionState),
                     MessageArguments.text("used", snapshot.ownedTotal()),
                     MessageArguments.text("capacity", capacity.maximum()),
                     MessageArguments.text("capacity_rule", capacity.ruleId().orElse("fallback")),
                     MessageArguments.text("active", snapshot.activeBoosters().size()),
                     MessageArguments.text("queued", queued),
                     MessageArguments.text("claims", snapshot.pendingClaims().size()),
+                    MessageArguments.text("inventory_breakdown", inventory),
+                    MessageArguments.text("active_breakdown", active),
+                    MessageArguments.text("queue_breakdown", queue),
                     MessageArguments.text("redis", runtime.redisStatus()))) {
                     sender.sendMessage(line);
                 }
@@ -698,7 +935,7 @@ public final class NetworkBoostersCommands {
 
     private static SourceReference reference(NetworkBoostersCommandRuntime runtime, CommandSender sender, String command) {
         Optional<UUID> actor = sender instanceof Player player ? Optional.of(player.getUniqueId()) : Optional.empty();
-        return new SourceReference(actor, Optional.of(command), Optional.of(runtime.configurationStore().requireCurrent().configuration().serverId()));
+        return new SourceReference(actor, Optional.empty(), Optional.of(runtime.configurationStore().requireCurrent().configuration().serverId()));
     }
 
     private static void sendActivationResult(CommandSender sender, NetworkBoostersCommandRuntime runtime, ActivationResult result, Throwable failure, BoosterId boosterId) {

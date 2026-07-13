@@ -38,9 +38,13 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 
 public final class ActivationMutationService implements AutoCloseable {
+
+    private static final ComponentLogger LOGGER = ComponentLogger.logger(ActivationMutationService.class);
 
     private final BoosterStorage storage;
     private final PlayerSnapshotCache snapshots;
@@ -118,7 +122,17 @@ public final class ActivationMutationService implements AutoCloseable {
                     });
             })
             .thenApply(this::publishActivation)
-            .exceptionally(ignored -> ActivationResult.rejected(ActivationStatus.SERVICE_UNAVAILABLE, 0));
+            .exceptionally(failure -> {
+                LOGGER.error(
+                    "NetworkBoosters activation failed player={} booster={} source={} server={}",
+                    request.playerId(),
+                    request.boosterId().value(),
+                    request.source(),
+                    request.sourceReference().serverId().orElse("unknown"),
+                    rootCause(failure)
+                );
+                return ActivationResult.rejected(ActivationStatus.SERVICE_UNAVAILABLE, 0);
+            });
     }
 
     public CompletableFuture<DeactivationResult> deactivate(DeactivationRequest request) {
@@ -128,7 +142,15 @@ public final class ActivationMutationService implements AutoCloseable {
         }
         return this.storage.write(connection -> this.deactivate(connection, request))
             .thenApply(this::publishDeactivation)
-            .exceptionally(ignored -> rejectedDeactivation(DeactivationStatus.SERVICE_UNAVAILABLE));
+            .exceptionally(failure -> {
+                LOGGER.error(
+                    "NetworkBoosters deactivation failed activation={} server={}",
+                    request.activationId(),
+                    request.sourceReference().serverId().orElse("unknown"),
+                    rootCause(failure)
+                );
+                return rejectedDeactivation(DeactivationStatus.SERVICE_UNAVAILABLE);
+            });
     }
 
     public CompletableFuture<Integer> expireDueActivations(int limit) {
@@ -511,13 +533,37 @@ public final class ActivationMutationService implements AutoCloseable {
     }
 
     private ActivationResult publishActivation(MutationOutcome<ActivationResult> outcome) {
-        this.postCommit.publish(new PostCommitMutation<>(outcome.result(), outcome.changes()));
+        this.publishPostCommit("activation", outcome.result().status().name(), outcome.changes());
         return outcome.result();
     }
 
     private DeactivationResult publishDeactivation(MutationOutcome<DeactivationResult> outcome) {
-        this.postCommit.publish(new PostCommitMutation<>(outcome.result(), outcome.changes()));
+        this.publishPostCommit("deactivation", outcome.result().status().name(), outcome.changes());
         return outcome.result();
+    }
+
+    private void publishPostCommit(String operation, String result, List<PostCommitChange> changes) {
+        if (changes.isEmpty()) {
+            return;
+        }
+        try {
+            this.postCommit.publish(new PostCommitMutation<>(result, changes));
+        } catch (RuntimeException exception) {
+            LOGGER.error(
+                "NetworkBoosters post-commit publication failed operation={} result={} changes={}",
+                operation,
+                result,
+                changes.size(),
+                exception
+            );
+        }
+    }
+
+    private static Throwable rootCause(Throwable failure) {
+        if (failure instanceof CompletionException completionException && completionException.getCause() != null) {
+            return completionException.getCause();
+        }
+        return failure;
     }
 
     private List<PostCommitChange> timelineChanges(PlayerBoostSnapshot snapshot, ReconciledGroup reconciled) {

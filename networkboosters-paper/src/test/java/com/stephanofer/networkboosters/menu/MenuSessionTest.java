@@ -40,4 +40,24 @@ final class MenuSessionTest {
             java.util.Optional.empty()
         ));
     }
+
+    @Test
+    void changingFilterReturnsToFirstPage() {
+        MenuSession session = MenuSession.initial().withPage(5);
+
+        MenuSession changed = session.withFilter(BoosterMenuFilter.TRANSFERABLE);
+
+        assertTrue(changed.page() == 1);
+        assertTrue(changed.filter() == BoosterMenuFilter.TRANSFERABLE);
+    }
+
+    @Test
+    void changingSortReturnsToFirstPage() {
+        MenuSession session = MenuSession.initial().withPage(5);
+
+        MenuSession changed = session.withSort(BoosterMenuSort.QUANTITY);
+
+        assertTrue(changed.page() == 1);
+        assertTrue(changed.sort() == BoosterMenuSort.QUANTITY);
+    }
 }

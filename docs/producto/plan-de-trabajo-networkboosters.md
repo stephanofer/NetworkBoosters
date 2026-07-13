@@ -401,29 +401,25 @@ Bloques 0 a 9 terminados.
 
 ### Objetivo
 
-Integrar el consumidor inicial, validar el sistema completo bajo condiciones reales y cerrar el producto al 100%.
+Validar el sistema completo bajo condiciones reales, endurecer su operación y cerrar el producto al 100%.
 
 ### Orden interno
 
-1. Integrar NetworkProgression con `network_progression:points`.
-2. Completar warnings y actualizaciones visuales de expiración.
-3. Completar observabilidad y diagnóstico operativo.
-4. Ejecutar pruebas integrales, de concurrencia, lifecycle, reinicio y degradación.
-5. Corregir todos los defectos encontrados.
-6. Verificar todos los criterios de aceptación.
-7. Realizar la documentación completa del proyecto terminado.
+1. Completar warnings y actualizaciones visuales de expiración.
+2. Completar observabilidad y diagnóstico operativo.
+3. Ejecutar pruebas integrales, de concurrencia, lifecycle, reinicio y degradación.
+4. Corregir todos los defectos encontrados.
+5. Verificar todos los criterios de aceptación aplicables a NetworkBoosters.
 
 ### Condición de cierre
 
-- NetworkProgression calcula recompensas mediante la API síncrona sin I/O;
-- el caso inicial `10 points -> 20 points` está verificado;
+- la API de cálculo síncrona funciona sin I/O y queda lista para consumidores externos;
 - el sistema supera los escenarios críticos de concurrencia y reinicio;
 - Redis degradado no provoca pérdida durable;
 - el lifecycle completo del plugin queda implementado y verificado;
 - todos los edge cases obligatorios están resueltos;
-- todos los criterios de aceptación del diseño final se cumplen;
-- no quedan funcionalidades, pruebas ni correcciones pendientes;
-- la documentación final refleja el comportamiento real del producto terminado.
+- todos los criterios de aceptación aplicables a NetworkBoosters se cumplen;
+- no quedan funcionalidades, pruebas ni correcciones pendientes.
 
 ### Detalle de referencia
 
@@ -441,8 +437,8 @@ Consultar principalmente las secciones 25, 28 a 31, 33 y 34 del diseño final.
 | 5. Activaciones, colas y cálculo | Terminado | Bloque 4 |
 | 6. Transferencias | Terminado | Bloque 5 |
 | 7. Eventos y sincronización Redis | Terminado | Bloques 3 a 6 |
-| 8. Localización e interfaces operativas | Pendiente | Bloque 7 |
-| 9. Menús y experiencia de usuario | Pendiente | Bloque 8 |
-| 10. Integración, endurecimiento y cierre | Pendiente | Bloques 0 a 9 |
+| 8. Localización e interfaces operativas | Terminado | Bloque 7 |
+| 9. Menús y experiencia de usuario | Terminado | Bloque 8 |
+| 10. Integración, endurecimiento y cierre | Terminado | Bloques 0 a 9 |
 
 Los estados admitidos son `Pendiente`, `En progreso`, `Bloqueado` y `Terminado`. Solo puede comenzar un bloque cuando todas sus dependencias estén marcadas como `Terminado`.

@@ -3,9 +3,11 @@ package com.stephanofer.networkboosters.menu.loader;
 import com.stephanofer.networkboosters.menu.NetworkBoostersMenuCoordinator;
 import com.stephanofer.networkboosters.menu.button.ActivationConfirmButton;
 import com.stephanofer.networkboosters.menu.button.ActivationPreviewButton;
+import com.stephanofer.networkboosters.menu.button.ClaimsEmptyStateButton;
 import com.stephanofer.networkboosters.menu.button.FilterButton;
 import com.stephanofer.networkboosters.menu.button.MenuSummaryButton;
 import com.stephanofer.networkboosters.menu.button.OpenClaimsButton;
+import com.stephanofer.networkboosters.menu.button.OwnedEmptyStateButton;
 import com.stephanofer.networkboosters.menu.button.SortButton;
 import com.stephanofer.networkboosters.menu.button.TransferAmountButton;
 import com.stephanofer.networkboosters.menu.button.TransferConfirmButton;
@@ -44,6 +46,18 @@ public final class SimpleMenuButtonLoader extends ButtonLoader {
 
     public static SimpleMenuButtonLoader openClaims(Plugin plugin, NetworkBoostersMenuCoordinator coordinator) {
         return new SimpleMenuButtonLoader(plugin, "NETWORKBOOSTERS_OPEN_CLAIMS", coordinator, (menu, ignored, path) -> new OpenClaimsButton(menu));
+    }
+
+    public static SimpleMenuButtonLoader ownedEmpty(Plugin plugin, NetworkBoostersMenuCoordinator coordinator) {
+        return new SimpleMenuButtonLoader(plugin, "NETWORKBOOSTERS_EMPTY_OWNED", coordinator, (menu, ignored, path) -> new OwnedEmptyStateButton(menu, OwnedEmptyStateButton.Reason.NO_INVENTORY));
+    }
+
+    public static SimpleMenuButtonLoader ownedFilterEmpty(Plugin plugin, NetworkBoostersMenuCoordinator coordinator) {
+        return new SimpleMenuButtonLoader(plugin, "NETWORKBOOSTERS_EMPTY_FILTER", coordinator, (menu, ignored, path) -> new OwnedEmptyStateButton(menu, OwnedEmptyStateButton.Reason.NO_FILTER_RESULTS));
+    }
+
+    public static SimpleMenuButtonLoader claimsEmpty(Plugin plugin, NetworkBoostersMenuCoordinator coordinator) {
+        return new SimpleMenuButtonLoader(plugin, "NETWORKBOOSTERS_EMPTY_CLAIMS", coordinator, (menu, ignored, path) -> new ClaimsEmptyStateButton(menu));
     }
 
     public static SimpleMenuButtonLoader activationPreview(Plugin plugin, NetworkBoostersMenuCoordinator coordinator) {

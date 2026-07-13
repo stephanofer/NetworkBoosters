@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -163,6 +164,51 @@ class ConfigurationLoaderTest {
         assertTrue(exception.issues().stream().anyMatch(issue -> issue.path().equals("scope.games[0]")));
         assertTrue(exception.issues().stream().anyMatch(issue ->
             issue.path().equals("multiplier") && issue.message().contains("6 decimal places")));
+    }
+
+    @Test
+    void bootstrapCommandsUseDefaultsWithoutPreparingFullResources() {
+        NetworkBoostersConfiguration.Commands commands = loader().loadBootstrapCommands();
+
+        assertEquals("boosters", commands.root());
+        assertEquals(List.of("booster", "boosts"), commands.aliases());
+        assertTrue(Files.isRegularFile(this.tempDir.resolve("config.yml")));
+        assertFalse(Files.exists(this.tempDir.resolve("boosters")));
+        assertFalse(Files.exists(this.tempDir.resolve("messages")));
+    }
+
+    @Test
+    void bootstrapCommandsUseExistingConfig() throws IOException {
+        Files.createDirectories(this.tempDir);
+        Files.writeString(this.tempDir.resolve("config.yml"), this.configContent
+            .replace("root: boosters", "root: nb")
+            .replace("- booster", "- networkbooster")
+            .replace("- boosts", "- nboosts"));
+
+        NetworkBoostersConfiguration.Commands commands = loader().loadBootstrapCommands();
+
+        assertEquals("nb", commands.root());
+        assertEquals(List.of("networkbooster", "nboosts"), commands.aliases());
+    }
+
+    @Test
+    void bootstrapCommandsRejectInvalidRoot() throws IOException {
+        Files.createDirectories(this.tempDir);
+        Files.writeString(this.tempDir.resolve("config.yml"), this.configContent.replace("root: boosters", "root: invalid/root"));
+
+        ConfigurationException exception = assertThrows(ConfigurationException.class, () -> loader().loadBootstrapCommands());
+
+        assertTrue(exception.issues().stream().anyMatch(issue -> issue.path().equals("commands.root")));
+    }
+
+    @Test
+    void bootstrapCommandsRejectInvalidAliases() throws IOException {
+        Files.createDirectories(this.tempDir);
+        Files.writeString(this.tempDir.resolve("config.yml"), this.configContent.replace("- booster", "- boosters"));
+
+        ConfigurationException exception = assertThrows(ConfigurationException.class, () -> loader().loadBootstrapCommands());
+
+        assertTrue(exception.issues().stream().anyMatch(issue -> issue.path().equals("commands.aliases[0]")));
     }
 
     private ConfigurationLoader loader() {

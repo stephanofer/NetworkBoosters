@@ -75,6 +75,8 @@ activation:
   queue-limit: "<red>Tu cola de boosters está llena."
   duration-limit: "<red>Esa activación superaría la duración máxima en cola."
   player-not-ready: "<yellow>Tus boosters todavía están cargando."
+  expiry-warning: "<yellow><name> <gray>x<multiplier></gray> expira en <white><remaining></white>."
+  expired: "<yellow><name> expiró."
 
 inventory:
   granted: "<green>Entregaste <name> x<amount>. Nueva cantidad: <new>."
@@ -121,9 +123,12 @@ admin:
     - "<gray>Settings ready: <white><settings_ready></white>"
     - "<gray>Boosters ready: <white><boosters_ready></white>"
     - "<gray>Revisión local: <white><local_revision></white>"
-    - "<gray>Revisión persistida: <white><persisted_revision></white>"
+    - "<gray>Revisión persistida: <white><persisted_revision></white> <dark_gray>(<revision_state>)</dark_gray>"
     - "<gray>Inventario: <white><used></white>/<white><capacity></white> <dark_gray>(<capacity_rule>)</dark_gray>"
     - "<gray>Activos: <white><active></white> Cola: <white><queued></white> Claims: <white><claims></white>"
+    - "<gray>Inventario detalle: <white><inventory_breakdown></white>"
+    - "<gray>Activos detalle: <white><active_breakdown></white>"
+    - "<gray>Cola detalle: <white><queue_breakdown></white>"
     - "<gray>Redis: <white><redis></white>"
   deactivated-all: "<green>Solicitaste desactivar <amount> booster(s) activo(s)."
   target-not-ready: "<yellow>El jugador objetivo todavía no está listo."

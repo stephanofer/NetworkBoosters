@@ -12,6 +12,7 @@ items:
     slot: 10
     item:
       material: RED_BUNDLE
+      hide-additional-tooltip: true
       name:
         default: "<red>-1"
         locales:
@@ -22,6 +23,7 @@ items:
     slot: 13
     item:
       material: BUNDLE
+      hide-additional-tooltip: true
       name:
         default: "<aqua>%booster_id% x%amount%"
         locales:
@@ -41,6 +43,7 @@ items:
     slot: 16
     item:
       material: LIME_BUNDLE
+      hide-additional-tooltip: true
       name:
         default: "<green>+1"
         locales:
@@ -54,6 +57,7 @@ items:
       - 18-20
     item:
       material: LIME_BUNDLE
+      hide-additional-tooltip: true
       name:
         default: "<green><bold>Transfer"
         locales:
@@ -67,6 +71,7 @@ items:
       - 24-26
     item:
       material: RED_BUNDLE
+      hide-additional-tooltip: true
       name:
         default: "<red><bold>Cancel"
         locales:

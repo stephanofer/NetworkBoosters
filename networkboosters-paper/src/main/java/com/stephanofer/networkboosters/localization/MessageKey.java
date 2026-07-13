@@ -68,6 +68,8 @@ public enum MessageKey {
     ACTIVATION_QUEUE_LIMIT("activation.queue-limit"),
     ACTIVATION_DURATION_LIMIT("activation.duration-limit"),
     ACTIVATION_PLAYER_NOT_READY("activation.player-not-ready"),
+    ACTIVATION_EXPIRY_WARNING("activation.expiry-warning"),
+    ACTIVATION_EXPIRED("activation.expired"),
 
     INVENTORY_GRANTED("inventory.granted"),
     INVENTORY_GRANTED_FORCED("inventory.granted-forced"),

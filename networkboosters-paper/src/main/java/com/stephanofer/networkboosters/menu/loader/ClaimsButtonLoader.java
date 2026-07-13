@@ -20,6 +20,6 @@ public final class ClaimsButtonLoader extends ButtonLoader {
 
     @Override
     public @Nullable Button load(@NotNull YamlConfiguration configuration, @NotNull String path, @NotNull DefaultButtonValue defaultButtonValue) {
-        return new ClaimsButton(this.coordinator, configuration.getInt(path + "empty-slot", -1));
+        return new ClaimsButton(this.coordinator);
     }
 }

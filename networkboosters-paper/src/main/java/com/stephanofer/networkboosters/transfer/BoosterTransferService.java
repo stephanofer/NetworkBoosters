@@ -29,13 +29,17 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 public final class BoosterTransferService implements AutoCloseable {
+
+    private static final ComponentLogger LOGGER = ComponentLogger.logger(BoosterTransferService.class);
 
     private final BoosterStorage storage;
     private final PlayerSnapshotCache snapshots;
@@ -69,7 +73,18 @@ public final class BoosterTransferService implements AutoCloseable {
         }
         return this.prepare(request)
             .thenCompose(prepared -> this.revalidateAndWrite(request, prepared))
-            .exceptionally(ignored -> this.result(request, TransferStatus.SERVICE_UNAVAILABLE));
+            .exceptionally(failure -> {
+                LOGGER.error(
+                    "NetworkBoosters transfer failed sender={} recipient={} booster={} amount={} source={}",
+                    request.senderId(),
+                    request.recipientId(),
+                    request.boosterId().value(),
+                    request.amount(),
+                    request.source(),
+                    rootCause(failure)
+                );
+                return this.result(request, TransferStatus.SERVICE_UNAVAILABLE);
+            });
     }
 
     private CompletableFuture<PreparedTransfer> prepare(BoosterTransferRequest request) {
@@ -277,14 +292,30 @@ public final class BoosterTransferService implements AutoCloseable {
     }
 
     private TransferResult publishTransfer(MutationOutcome outcome) {
-        if (outcome.senderSnapshot().isPresent() && outcome.recipientSnapshot().isPresent()) {
-            this.postCommit.publish(new PostCommitMutation<>(outcome.result(), java.util.List.of(new PostCommitChange.TransferCompleted(
-                outcome.result(),
-                outcome.senderSnapshot().orElseThrow(),
-                outcome.recipientSnapshot().orElseThrow()
-            ))));
+        try {
+            if (outcome.senderSnapshot().isPresent() && outcome.recipientSnapshot().isPresent()) {
+                this.postCommit.publish(new PostCommitMutation<>(outcome.result(), java.util.List.of(new PostCommitChange.TransferCompleted(
+                    outcome.result(),
+                    outcome.senderSnapshot().orElseThrow(),
+                    outcome.recipientSnapshot().orElseThrow()
+                ))));
+            }
+        } catch (RuntimeException exception) {
+            LOGGER.error(
+                "NetworkBoosters transfer post-commit publication failed status={} transfer={}",
+                outcome.result().status(),
+                outcome.result().transferId().map(UUID::toString).orElse("none"),
+                exception
+            );
         }
         return outcome.result();
+    }
+
+    private static Throwable rootCause(Throwable failure) {
+        if (failure instanceof CompletionException completionException && completionException.getCause() != null) {
+            return completionException.getCause();
+        }
+        return failure;
     }
 
     private void auditTransfer(

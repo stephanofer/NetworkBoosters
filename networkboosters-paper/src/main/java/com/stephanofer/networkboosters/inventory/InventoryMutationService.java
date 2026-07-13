@@ -37,12 +37,15 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
 public final class InventoryMutationService {
 
     private static final String FORCE_PERMISSION = "networkboosters.admin.give.force";
+    private static final ComponentLogger LOGGER = ComponentLogger.logger(InventoryMutationService.class);
 
     private final BoosterStorage storage;
     private final PlayerSnapshotCache snapshots;
@@ -83,7 +86,10 @@ public final class InventoryMutationService {
         ResolvedInventoryCapacity capacity = this.resolveCapacity(request.playerId());
         return this.storage.write(connection -> this.grant(connection, request, capacity))
             .thenApply(this::publishInventoryResult)
-            .exceptionally(ignored -> result(InventoryMutationStatus.SERVICE_UNAVAILABLE, request.boosterId(), 0, 0));
+            .exceptionally(failure -> {
+                this.logInventoryFailure("grant", request.playerId(), request.boosterId(), request.amount(), request.source().name(), failure);
+                return result(InventoryMutationStatus.SERVICE_UNAVAILABLE, request.boosterId(), 0, 0);
+            });
     }
 
     public CompletableFuture<InventoryMutationResult> revoke(InventoryRevokeRequest request) {
@@ -93,7 +99,10 @@ public final class InventoryMutationService {
         }
         return this.storage.write(connection -> this.revoke(connection, request))
             .thenApply(this::publishInventoryResult)
-            .exceptionally(ignored -> result(InventoryMutationStatus.SERVICE_UNAVAILABLE, request.boosterId(), 0, 0));
+            .exceptionally(failure -> {
+                this.logInventoryFailure("revoke", request.playerId(), request.boosterId(), request.amount(), request.source().name(), failure);
+                return result(InventoryMutationStatus.SERVICE_UNAVAILABLE, request.boosterId(), 0, 0);
+            });
     }
 
     public CompletableFuture<InventoryMutationResult> setInventoryAmount(InventorySetRequest request) {
@@ -108,7 +117,10 @@ public final class InventoryMutationService {
         ResolvedInventoryCapacity capacity = this.resolveCapacity(request.playerId());
         return this.storage.write(connection -> this.setInventoryAmount(connection, request, capacity))
             .thenApply(this::publishInventoryResult)
-            .exceptionally(ignored -> result(InventoryMutationStatus.SERVICE_UNAVAILABLE, request.boosterId(), 0, 0));
+            .exceptionally(failure -> {
+                this.logInventoryFailure("set", request.playerId(), request.boosterId(), request.amount(), request.source().name(), failure);
+                return result(InventoryMutationStatus.SERVICE_UNAVAILABLE, request.boosterId(), 0, 0);
+            });
     }
 
     public CompletableFuture<ClaimResult> claim(ClaimRequest request) {
@@ -120,7 +132,15 @@ public final class InventoryMutationService {
         ResolvedInventoryCapacity capacity = this.resolveCapacity(request.playerId());
         return this.storage.write(connection -> this.claim(connection, request, capacity))
             .thenApply(this::publishClaimResult)
-            .exceptionally(ignored -> new ClaimResult(ClaimResultStatus.SERVICE_UNAVAILABLE, Optional.empty(), 0));
+            .exceptionally(failure -> {
+                LOGGER.error(
+                    "NetworkBoosters claim failed player={} claim={}",
+                    request.playerId(),
+                    request.claimId(),
+                    rootCause(failure)
+                );
+                return new ClaimResult(ClaimResultStatus.SERVICE_UNAVAILABLE, Optional.empty(), 0);
+            });
     }
 
     private MutationOutcome<InventoryMutationResult> grant(
@@ -431,7 +451,7 @@ public final class InventoryMutationService {
                     cause(result.status()),
                     Optional.empty()
                 );
-            this.postCommit.publish(new PostCommitMutation<>(result, java.util.List.of(change)));
+            this.publishPostCommit(result.status().name(), java.util.List.of(change));
         });
         return outcome.result();
     }
@@ -439,8 +459,8 @@ public final class InventoryMutationService {
     private ClaimResult publishClaimResult(MutationOutcome<ClaimResult> outcome) {
         outcome.snapshot().ifPresent(snapshot -> {
             ClaimResult result = outcome.result();
-            result.claim().ifPresent(claim -> this.postCommit.publish(new PostCommitMutation<>(
-                result,
+            result.claim().ifPresent(claim -> this.publishPostCommit(
+                result.status().name(),
                 java.util.List.of(
                     new PostCommitChange.InventoryChanged(
                         snapshot,
@@ -452,9 +472,44 @@ public final class InventoryMutationService {
                     ),
                     new PostCommitChange.ClaimCompleted(snapshot, claim, result.inventoryAmount())
                 )
-            )));
+            ));
         });
         return outcome.result();
+    }
+
+    private void publishPostCommit(String result, java.util.List<PostCommitChange> changes) {
+        if (changes.isEmpty()) {
+            return;
+        }
+        try {
+            this.postCommit.publish(new PostCommitMutation<>(result, changes));
+        } catch (RuntimeException exception) {
+            LOGGER.error(
+                "NetworkBoosters inventory post-commit publication failed result={} changes={}",
+                result,
+                changes.size(),
+                exception
+            );
+        }
+    }
+
+    private void logInventoryFailure(String operation, UUID playerId, BoosterId boosterId, long amount, String source, Throwable failure) {
+        LOGGER.error(
+            "NetworkBoosters inventory mutation failed operation={} player={} booster={} amount={} source={}",
+            operation,
+            playerId,
+            boosterId.value(),
+            amount,
+            source,
+            rootCause(failure)
+        );
+    }
+
+    private static Throwable rootCause(Throwable failure) {
+        if (failure instanceof CompletionException completionException && completionException.getCause() != null) {
+            return completionException.getCause();
+        }
+        return failure;
     }
 
     private static InventoryChangeCause cause(InventoryMutationStatus status) {

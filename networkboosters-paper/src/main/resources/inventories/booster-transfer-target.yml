@@ -35,6 +35,7 @@ items:
     slot: 49
     item:
       material: RED_BUNDLE
+      hide-additional-tooltip: true
       name:
         default: "<red>Back"
         locales:

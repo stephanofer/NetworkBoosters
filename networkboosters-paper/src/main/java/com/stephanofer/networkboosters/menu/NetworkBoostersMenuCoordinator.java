@@ -112,7 +112,7 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
 
     public void openClaims(Player player) {
         if (this.canTouchUi(player)) {
-            this.zmenu.open(player, CLAIMS_MENU, 1);
+            this.zmenu.openWithHistory(player, CLAIMS_MENU, 1);
         }
     }
 
@@ -206,6 +206,18 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
 
     public List<BoosterClaim> claims(Player player) {
         return this.runtime.service().getCachedOrEmpty(player.getUniqueId()).pendingClaims();
+    }
+
+    public boolean hasOwnedBoosters(Player player) {
+        return this.runtime.service().getCachedOrEmpty(player.getUniqueId()).inventory().values().stream().anyMatch(amount -> amount > 0);
+    }
+
+    public boolean hasVisibleOwnedBoosters(Player player) {
+        return !this.views(player).isEmpty();
+    }
+
+    public boolean hasPendingClaims(Player player) {
+        return !this.claims(player).isEmpty();
     }
 
     public void selectTransferTarget(Player sender, Player recipient) {
@@ -306,12 +318,32 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
         Placeholders placeholders = new Placeholders();
         placeholders.register("filter", session.filter().name().toLowerCase(java.util.Locale.ROOT));
         placeholders.register("sort", session.sort().name().toLowerCase(java.util.Locale.ROOT));
+        this.registerFilterPlaceholders(placeholders, session.filter());
+        this.registerSortPlaceholders(placeholders, session.sort());
         placeholders.register("owned_total", String.valueOf(snapshot.ownedTotal()));
         placeholders.register("active_count", String.valueOf(snapshot.activeBoosters().size()));
         placeholders.register("queue_count", String.valueOf(snapshot.queuedBoosters().values().stream().mapToLong(List::size).sum()));
         placeholders.register("claims_count", String.valueOf(snapshot.pendingClaims().size()));
         placeholders.register("capacity", String.valueOf(this.runtime.capacity(player).maximum()));
         return placeholders;
+    }
+
+    private void registerFilterPlaceholders(Placeholders placeholders, BoosterMenuFilter active) {
+        for (BoosterMenuFilter filter : BoosterMenuFilter.values()) {
+            String key = filter.name().toLowerCase(java.util.Locale.ROOT);
+            boolean selected = filter == active;
+            placeholders.register("filter_" + key + "_marker", selected ? "> " : "  ");
+            placeholders.register("filter_" + key + "_color", selected ? "<aqua>" : "<dark_gray>");
+        }
+    }
+
+    private void registerSortPlaceholders(Placeholders placeholders, BoosterMenuSort active) {
+        for (BoosterMenuSort sort : BoosterMenuSort.values()) {
+            String key = sort.name().toLowerCase(java.util.Locale.ROOT);
+            boolean selected = sort == active;
+            placeholders.register("sort_" + key + "_marker", selected ? "> " : "  ");
+            placeholders.register("sort_" + key + "_color", selected ? "<aqua>" : "<dark_gray>");
+        }
     }
 
     public Placeholders boosterPlaceholders(Player player, OwnedBoosterView view) {
@@ -399,7 +431,7 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
     }
 
     private SourceReference reference(Player player, String operation) {
-        return new SourceReference(Optional.of(player.getUniqueId()), Optional.of(operation), Optional.of(this.runtime.configurationStore().requireCurrent().configuration().serverId()));
+        return new SourceReference(Optional.of(player.getUniqueId()), Optional.empty(), Optional.of(this.runtime.configurationStore().requireCurrent().configuration().serverId()));
     }
 
     private void send(Player player, MessageKey key) {

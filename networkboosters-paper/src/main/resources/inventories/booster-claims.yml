@@ -10,7 +10,6 @@ patterns:
 items:
   claims:
     type: NETWORKBOOSTERS_CLAIMS
-    empty-slot: 22
     slots:
       - 10-16
       - 19-25
@@ -33,11 +32,30 @@ items:
           en:
             - "<gray>Claim: <white>%claim_id%</white>"
             - "<yellow>Click to claim."
+  empty-claims:
+    type: NETWORKBOOSTERS_EMPTY_CLAIMS
+    slot: 22
+    item:
+      material: PAPER
+      name:
+        default: "<yellow><bold>No pending rewards"
+        locales:
+          es: "<yellow><bold>No tenés recompensas pendientes"
+          en: "<yellow><bold>No pending rewards"
+      lore:
+        default:
+          - "<gray>All your booster rewards have been claimed."
+        locales:
+          es:
+            - "<gray>Todas tus recompensas de potenciadores ya fueron reclamadas."
+          en:
+            - "<gray>All your booster rewards have been claimed."
   back:
     type: BACK
     slot: 49
     item:
       material: RED_BUNDLE
+      hide-additional-tooltip: true
       name:
         default: "<red>Back"
         locales:

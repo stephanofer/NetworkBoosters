@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.hera.craftkit.database.Database;
 import com.hera.craftkit.database.DatabaseConfig;
@@ -13,17 +15,31 @@ import com.stephanofer.networkboosters.api.booster.ActivationGroup;
 import com.stephanofer.networkboosters.api.booster.ActivationRequirements;
 import com.stephanofer.networkboosters.api.booster.ActiveBooster;
 import com.stephanofer.networkboosters.api.booster.BoosterId;
+import com.stephanofer.networkboosters.api.booster.BoosterCategory;
+import com.stephanofer.networkboosters.api.booster.BoosterDefinition;
 import com.stephanofer.networkboosters.api.booster.BoosterScope;
 import com.stephanofer.networkboosters.api.booster.BoosterTarget;
 import com.stephanofer.networkboosters.api.booster.ConflictPolicy;
+import com.stephanofer.networkboosters.api.booster.TransferPolicy;
+import com.stephanofer.networkboosters.api.request.InventoryGrantRequest;
+import com.stephanofer.networkboosters.api.result.InventoryMutationStatus;
 import com.stephanofer.networkboosters.api.result.TransferStatus;
 import com.stephanofer.networkboosters.api.source.ActivationSource;
+import com.stephanofer.networkboosters.api.source.MutationSource;
 import com.stephanofer.networkboosters.api.source.SourceReference;
 import com.stephanofer.networkboosters.api.source.TransferSource;
+import com.stephanofer.networkboosters.config.ConfigurationSnapshot;
+import com.stephanofer.networkboosters.config.ConfigurationStore;
+import com.stephanofer.networkboosters.config.NetworkBoostersConfiguration;
+import com.stephanofer.networkboosters.config.booster.BoosterDefinitionRegistry;
+import com.stephanofer.networkboosters.inventory.InventoryMutationService;
+import com.stephanofer.networkboosters.player.PlayerSnapshotCache;
+import com.stephanofer.networkboosters.synchronization.PostCommitSynchronizer;
 import com.stephanofer.networkboosters.transfer.TransferRepository;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletableFuture;
@@ -31,6 +47,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.bukkit.Server;
 
 @EnabledIfEnvironmentVariable(named = "NETWORKBOOSTERS_TEST_MYSQL_HOST", matches = ".+")
 class BoosterStorageMySqlIntegrationTest {
@@ -136,6 +153,102 @@ class BoosterStorageMySqlIntegrationTest {
         assertTrue(storage.loadSnapshot(playerId).join().activeBoosters().isEmpty());
     }
 
+    @Test
+    void manualAdminGrantsWithoutExternalReferenceAreIndependentMutations() {
+        UUID playerId = UUID.randomUUID();
+        BoosterId boosterId = BoosterId.of("personal_points_x2");
+        InventoryMutationService service = inventoryService(boosterId, PostCommitSynchronizer.noop());
+        SourceReference manualReference = new SourceReference(Optional.empty(), Optional.empty(), Optional.of("test-server"));
+
+        assertEquals(InventoryMutationStatus.GRANTED, service.grant(new InventoryGrantRequest(
+            playerId,
+            boosterId,
+            1,
+            MutationSource.ADMIN_COMMAND,
+            manualReference,
+            false
+        )).join().status());
+        assertEquals(InventoryMutationStatus.GRANTED, service.grant(new InventoryGrantRequest(
+            playerId,
+            boosterId,
+            1,
+            MutationSource.ADMIN_COMMAND,
+            manualReference,
+            false
+        )).join().status());
+
+        assertEquals(2, storage.loadSnapshot(playerId).join().ownedAmount(boosterId));
+    }
+
+    @Test
+    void externalReferenceStillKeepsSystemGrantIdempotent() {
+        UUID playerId = UUID.randomUUID();
+        BoosterId boosterId = BoosterId.of("personal_points_x2");
+        InventoryMutationService service = inventoryService(boosterId, PostCommitSynchronizer.noop());
+        SourceReference externalReference = new SourceReference(Optional.empty(), Optional.of("reward-transaction-1"), Optional.of("test-server"));
+
+        assertEquals(InventoryMutationStatus.GRANTED, service.grant(new InventoryGrantRequest(
+            playerId,
+            boosterId,
+            1,
+            MutationSource.SYSTEM,
+            externalReference,
+            false
+        )).join().status());
+        assertEquals(InventoryMutationStatus.DUPLICATE_REQUEST, service.grant(new InventoryGrantRequest(
+            playerId,
+            boosterId,
+            1,
+            MutationSource.SYSTEM,
+            externalReference,
+            false
+        )).join().status());
+
+        assertEquals(1, storage.loadSnapshot(playerId).join().ownedAmount(boosterId));
+    }
+
+    @Test
+    void postCommitPublicationFailureDoesNotOverrideCommittedGrantResult() {
+        UUID playerId = UUID.randomUUID();
+        BoosterId boosterId = BoosterId.of("personal_points_x2");
+        InventoryMutationService service = inventoryService(boosterId, mutation -> {
+            throw new IllegalStateException("post commit unavailable");
+        });
+
+        assertEquals(InventoryMutationStatus.GRANTED, service.grant(new InventoryGrantRequest(
+            playerId,
+            boosterId,
+            1,
+            MutationSource.ADMIN_COMMAND,
+            SourceReference.none(),
+            false
+        )).join().status());
+        assertEquals(1, storage.loadSnapshot(playerId).join().ownedAmount(boosterId));
+    }
+
+    private static InventoryMutationService inventoryService(BoosterId boosterId, PostCommitSynchronizer postCommit) {
+        PlayerSnapshotCache snapshots = mock(PlayerSnapshotCache.class);
+        when(snapshots.isReady(org.mockito.ArgumentMatchers.any(UUID.class))).thenReturn(true);
+        return new InventoryMutationService(
+            storage,
+            snapshots,
+            configurationStore(boosterId),
+            mock(Server.class),
+            postCommit
+        );
+    }
+
+    private static ConfigurationStore configurationStore(BoosterId boosterId) {
+        NetworkBoostersConfiguration configuration = mock(NetworkBoostersConfiguration.class);
+        when(configuration.inventoryLimits()).thenReturn(new NetworkBoostersConfiguration.InventoryLimits(30, java.util.List.of()));
+        ConfigurationSnapshot snapshot = mock(ConfigurationSnapshot.class);
+        when(snapshot.configuration()).thenReturn(configuration);
+        when(snapshot.definitions()).thenReturn(new BoosterDefinitionRegistry(java.util.Map.of(boosterId, definition(boosterId))));
+        ConfigurationStore store = mock(ConfigurationStore.class);
+        when(store.requireCurrent()).thenReturn(snapshot);
+        return store;
+    }
+
     private static ActiveBooster active(UUID playerId, UUID activationId) {
         Instant now = Instant.now();
         return new ActiveBooster(
@@ -152,6 +265,23 @@ class BoosterStorageMySqlIntegrationTest {
             now.plusSeconds(3600),
             ActivationSource.SYSTEM,
             SourceReference.none()
+        );
+    }
+
+    private static BoosterDefinition definition(BoosterId boosterId) {
+        return new BoosterDefinition(
+            boosterId,
+            BoosterTarget.NETWORK_PROGRESSION_POINTS,
+            BigDecimal.valueOf(2),
+            Duration.ofHours(2),
+            BoosterScope.personalGlobal(),
+            ActivationGroup.of("personal-points"),
+            ConflictPolicy.QUEUE,
+            ActivationRequirements.NONE,
+            new TransferPolicy(true, 1, 5, Duration.ZERO, Optional.empty()),
+            true,
+            100,
+            BoosterCategory.of("points")
         );
     }
 

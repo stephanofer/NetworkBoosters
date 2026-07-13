@@ -18,6 +18,7 @@ import com.stephanofer.networkboosters.api.NetworkBoostersService;
 import com.stephanofer.networkboosters.NetworkBoostersPlugin;
 import com.stephanofer.networkboosters.booster.ActivationMutationService;
 import com.stephanofer.networkboosters.booster.ExpirationCoordinator;
+import com.stephanofer.networkboosters.booster.ExpiryWarningCoordinator;
 import com.stephanofer.networkboosters.booster.PlayerPermissionProvider;
 import com.stephanofer.networkboosters.calculation.BoostCalculator;
 import com.stephanofer.networkboosters.capacity.InventoryCapacityResolver;
@@ -98,6 +99,7 @@ public final class NetworkBoostersLifecycle implements Listener, NetworkBoosters
     private ActivationMutationService activationMutationService;
     private BoosterTransferService transferService;
     private ExpirationCoordinator expirationCoordinator;
+    private ExpiryWarningCoordinator expiryWarningCoordinator;
     private NetworkBoostersServiceImpl boostersService;
     private BoosterEventDispatcher eventDispatcher;
     private DelegatingPostCommitSynchronizer postCommitSynchronizer;
@@ -286,6 +288,9 @@ public final class NetworkBoostersLifecycle implements Listener, NetworkBoosters
                     candidate.definitions().size(),
                     candidate.warnings().size()
                 );
+            }
+            if (this.zmenu != null) {
+                this.zmenu.reload();
             }
             ConfigurationSnapshot published = this.configurationStore.replace(candidate);
             published.warnings().forEach(issue -> this.logger.warn("{}:{} - {}", issue.file(), issue.path(), issue.message()));
@@ -573,6 +578,9 @@ public final class NetworkBoostersLifecycle implements Listener, NetworkBoosters
                 registry.button(SimpleMenuButtonLoader.filter(this.plugin, this.menuCoordinator));
                 registry.button(SimpleMenuButtonLoader.sort(this.plugin, this.menuCoordinator));
                 registry.button(SimpleMenuButtonLoader.openClaims(this.plugin, this.menuCoordinator));
+                registry.button(SimpleMenuButtonLoader.ownedEmpty(this.plugin, this.menuCoordinator));
+                registry.button(SimpleMenuButtonLoader.ownedFilterEmpty(this.plugin, this.menuCoordinator));
+                registry.button(SimpleMenuButtonLoader.claimsEmpty(this.plugin, this.menuCoordinator));
                 registry.button(SimpleMenuButtonLoader.activationPreview(this.plugin, this.menuCoordinator));
                 registry.button(SimpleMenuButtonLoader.activationConfirm(this.plugin, this.menuCoordinator));
                 registry.button(SimpleMenuButtonLoader.transferPreview(this.plugin, this.menuCoordinator));
@@ -591,6 +599,17 @@ public final class NetworkBoostersLifecycle implements Listener, NetworkBoosters
             .inventories("inventories")
             .load();
         this.plugin.getServer().getPluginManager().registerEvents(this.menuCoordinator, this.plugin);
+        this.expiryWarningCoordinator = new ExpiryWarningCoordinator(
+            this.plugin,
+            this.logger,
+            this.configurationStore,
+            this.boostersService,
+            this.localizationService,
+            this.clock,
+            this.menuCoordinator::update
+        );
+        this.plugin.getServer().getPluginManager().registerEvents(this.expiryWarningCoordinator, this.plugin);
+        this.expiryWarningCoordinator.start();
         this.logger.info("zMenu integration loaded and reload verified in {} ms", elapsedMillis(started));
     }
 
@@ -676,6 +695,13 @@ public final class NetworkBoostersLifecycle implements Listener, NetworkBoosters
             if (this.reconciliationCoordinator != null) {
                 this.reconciliationCoordinator.close();
                 this.reconciliationCoordinator = null;
+            }
+        });
+        closeFailure = close("NetworkBoosters expiry warning coordinator", closeFailure, () -> {
+            if (this.expiryWarningCoordinator != null) {
+                HandlerList.unregisterAll(this.expiryWarningCoordinator);
+                this.expiryWarningCoordinator.close();
+                this.expiryWarningCoordinator = null;
             }
         });
         closeFailure = close("NetworkBoosters invalidation subscriber", closeFailure, () -> {

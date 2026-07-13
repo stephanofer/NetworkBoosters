@@ -48,14 +48,32 @@ items:
           en: "<aqua><bold>Filter"
       lore:
         default:
-          - "<gray>Current: <white>%filter%</white>"
+          - "%filter_all_color%%filter_all_marker%All"
+          - "%filter_active_color%%filter_active_marker%Active"
+          - "%filter_current_context_color%%filter_current_context_marker%Current context"
+          - "%filter_points_color%%filter_points_marker%Points"
+          - "%filter_locked_color%%filter_locked_marker%Locked"
+          - "%filter_transferable_color%%filter_transferable_marker%Transferable"
+          - ""
           - "<yellow>Click to change."
         locales:
           es:
-            - "<gray>Actual: <white>%filter%</white>"
+            - "%filter_all_color%%filter_all_marker%Todos"
+            - "%filter_active_color%%filter_active_marker%Activos"
+            - "%filter_current_context_color%%filter_current_context_marker%Contexto actual"
+            - "%filter_points_color%%filter_points_marker%Points"
+            - "%filter_locked_color%%filter_locked_marker%Bloqueados"
+            - "%filter_transferable_color%%filter_transferable_marker%Transferibles"
+            - ""
             - "<yellow>Click para cambiar."
           en:
-            - "<gray>Current: <white>%filter%</white>"
+            - "%filter_all_color%%filter_all_marker%All"
+            - "%filter_active_color%%filter_active_marker%Active"
+            - "%filter_current_context_color%%filter_current_context_marker%Current context"
+            - "%filter_points_color%%filter_points_marker%Points"
+            - "%filter_locked_color%%filter_locked_marker%Locked"
+            - "%filter_transferable_color%%filter_transferable_marker%Transferable"
+            - ""
             - "<yellow>Click to change."
 
   sort:
@@ -70,14 +88,20 @@ items:
           en: "<aqua><bold>Sort"
       lore:
         default:
-          - "<gray>Current: <white>%sort%</white>"
+          - "%sort_recommended_color%%sort_recommended_marker%Recommended"
+          - "%sort_quantity_color%%sort_quantity_marker%Quantity"
+          - ""
           - "<yellow>Click to change."
         locales:
           es:
-            - "<gray>Actual: <white>%sort%</white>"
+            - "%sort_recommended_color%%sort_recommended_marker%Recomendado"
+            - "%sort_quantity_color%%sort_quantity_marker%Cantidad"
+            - ""
             - "<yellow>Click para cambiar."
           en:
-            - "<gray>Current: <white>%sort%</white>"
+            - "%sort_recommended_color%%sort_recommended_marker%Recommended"
+            - "%sort_quantity_color%%sort_quantity_marker%Quantity"
+            - ""
             - "<yellow>Click to change."
 
   claims:
@@ -104,7 +128,6 @@ items:
 
   owned-boosters:
     type: NETWORKBOOSTERS_OWNED_BOOSTERS
-    empty-slot: 22
     slots:
       - 10-16
       - 19-25
@@ -142,3 +165,47 @@ items:
             - ""
             - "<yellow>Left click to activate."
             - "<yellow>Right click to transfer."
+
+  empty-owned:
+    type: NETWORKBOOSTERS_EMPTY_OWNED
+    slot: 22
+    item:
+      material: GRAY_DYE
+      name:
+        default: "<yellow><bold>No boosters"
+        locales:
+          es: "<yellow><bold>No tenés potenciadores"
+          en: "<yellow><bold>No boosters"
+      lore:
+        default:
+          - "<gray>Your booster inventory is empty."
+          - "<dark_gray>Earn boosters from rewards, events, and network content."
+        locales:
+          es:
+            - "<gray>Tu inventario de potenciadores está vacío."
+            - "<dark_gray>Conseguilos mediante recompensas, eventos y contenido de la network."
+          en:
+            - "<gray>Your booster inventory is empty."
+            - "<dark_gray>Earn boosters from rewards, events, and network content."
+
+  empty-filter:
+    type: NETWORKBOOSTERS_EMPTY_FILTER
+    slot: 22
+    item:
+      material: HOPPER
+      name:
+        default: "<yellow><bold>No results"
+        locales:
+          es: "<yellow><bold>No hay resultados"
+          en: "<yellow><bold>No results"
+      lore:
+        default:
+          - "<gray>No booster matches the selected filter."
+          - "<yellow>Change the filter to see more boosters."
+        locales:
+          es:
+            - "<gray>Ningún potenciador coincide con el filtro seleccionado."
+            - "<yellow>Cambiá el filtro para ver más potenciadores."
+          en:
+            - "<gray>No booster matches the selected filter."
+            - "<yellow>Change the filter to see more boosters."

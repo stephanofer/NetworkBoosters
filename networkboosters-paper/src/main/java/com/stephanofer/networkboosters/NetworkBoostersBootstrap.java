@@ -25,6 +25,13 @@ public final class NetworkBoostersBootstrap implements PluginBootstrap {
             .executionCoordinator(ExecutionCoordinator.simpleCoordinator())
             .buildBootstrapped(context);
         this.registerLocalizedCommandErrors();
+
+        ConfigurationLoader configurationLoader = new ConfigurationLoader(
+            context.getDataDirectory().toFile(),
+            path -> NetworkBoostersBootstrap.class.getClassLoader().getResourceAsStream(path)
+        );
+        var commands = configurationLoader.loadBootstrapCommands();
+        new NetworkBoostersCommands(this.commandBridge, commands).register(this.commandManager);
     }
 
     @Override
@@ -32,12 +39,6 @@ public final class NetworkBoostersBootstrap implements PluginBootstrap {
         if (this.commandManager == null) {
             throw new IllegalStateException("NetworkBoosters command manager was not bootstrapped");
         }
-        ConfigurationLoader configurationLoader = new ConfigurationLoader(
-            context.getDataDirectory().toFile(),
-            path -> NetworkBoostersBootstrap.class.getClassLoader().getResourceAsStream(path)
-        );
-        var commands = configurationLoader.load().configuration().commands();
-        new NetworkBoostersCommands(this.commandBridge, commands).register(this.commandManager);
         return new NetworkBoostersPlugin(this.commandManager, this.commandBridge);
     }
 
