@@ -12,13 +12,19 @@ import java.util.Optional;
 
 public final class BoosterDefinitionRegistry {
 
-    private static final BoosterDefinitionRegistry EMPTY = new BoosterDefinitionRegistry(Map.of());
+    private static final BoosterDefinitionRegistry EMPTY = new BoosterDefinitionRegistry(Map.of(), Map.of());
 
     private final Map<BoosterId, BoosterDefinition> definitions;
+    private final Map<BoosterId, BoosterDisplay> displays;
     private final List<BoosterDefinition> orderedDefinitions;
 
     public BoosterDefinitionRegistry(Map<BoosterId, BoosterDefinition> definitions) {
+        this(definitions, Map.of());
+    }
+
+    public BoosterDefinitionRegistry(Map<BoosterId, BoosterDefinition> definitions, Map<BoosterId, BoosterDisplay> displays) {
         Objects.requireNonNull(definitions, "definitions");
+        Objects.requireNonNull(displays, "displays");
         this.orderedDefinitions = definitions.values().stream()
             .sorted(Comparator
                 .comparingInt(BoosterDefinition::displayOrder)
@@ -30,6 +36,11 @@ public final class BoosterDefinitionRegistry {
             ordered.put(definition.id(), definition);
         }
         this.definitions = Map.copyOf(ordered);
+        LinkedHashMap<BoosterId, BoosterDisplay> orderedDisplays = new LinkedHashMap<>();
+        for (BoosterDefinition definition : this.orderedDefinitions) {
+            orderedDisplays.put(definition.id(), displays.getOrDefault(definition.id(), BoosterDisplay.defaults()));
+        }
+        this.displays = Map.copyOf(orderedDisplays);
     }
 
     public static BoosterDefinitionRegistry empty() {
@@ -42,6 +53,10 @@ public final class BoosterDefinitionRegistry {
 
     public Collection<BoosterDefinition> definitions() {
         return this.orderedDefinitions;
+    }
+
+    public BoosterDisplay display(BoosterId id) {
+        return this.displays.getOrDefault(Objects.requireNonNull(id, "id"), BoosterDisplay.defaults());
     }
 
     public Map<BoosterId, BoosterDefinition> asMap() {

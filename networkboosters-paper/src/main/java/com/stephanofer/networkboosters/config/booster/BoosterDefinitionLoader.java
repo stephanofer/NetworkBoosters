@@ -30,12 +30,14 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.regex.Pattern;
 
 public final class BoosterDefinitionLoader {
 
     private static final Pattern SCOPE_ID_PATTERN = Pattern.compile("[a-z0-9][a-z0-9._-]{0,63}");
+    private static final Pattern MATERIAL_ID_PATTERN = Pattern.compile("[A-Z0-9][A-Z0-9_]{0,63}");
     private static final int PERSISTED_MULTIPLIER_SCALE = 6;
 
     private final File boostersDirectory;
@@ -49,6 +51,7 @@ public final class BoosterDefinitionLoader {
     public BoosterDefinitionRegistry load(List<ConfigurationIssue> issues) {
         Objects.requireNonNull(issues, "issues");
         Map<BoosterId, BoosterDefinition> definitions = new LinkedHashMap<>();
+        Map<BoosterId, BoosterDisplay> displays = new LinkedHashMap<>();
         Map<BoosterId, String> firstDeclaration = new LinkedHashMap<>();
 
         if (!this.boostersDirectory.isDirectory()) {
@@ -86,13 +89,51 @@ public final class BoosterDefinitionLoader {
                 continue;
             }
             definitions.put(definition.id(), definition);
+            displays.put(definition.id(), this.display(relative(entry), definition.id(), entry, issues));
 
             if (!BoosterTarget.NETWORK_PROGRESSION_POINTS.equals(definition.target())) {
                 issues.add(ConfigurationIssue.warning(relative(entry), "target", "No built-in consumer is currently known for target " + definition.target()));
             }
         }
 
-        return new BoosterDefinitionRegistry(definitions);
+        return new BoosterDefinitionRegistry(definitions, displays);
+    }
+
+    private BoosterDisplay display(String source, BoosterId id, File file, List<ConfigurationIssue> issues) {
+        try {
+            YamlDocument document = YamlDocument.create(
+                file,
+                LoaderSettings.builder()
+                    .setAutoUpdate(false)
+                    .setAllowDuplicateKeys(false)
+                    .setErrorLabel(source)
+                    .build()
+            );
+            String material = optionalString(source, document, "display.material", "TRIAL_KEY", issues);
+            String lockedMaterial = optionalString(source, document, "display.locked-material", "OMINOUS_TRIAL_KEY", issues);
+            String activeMaterial = optionalString(source, document, "display.active-material", "HEAVY_CORE", issues);
+            Integer customModelData = optionalInt(document, "display.custom-model-data", null, issues, source);
+            Boolean glow = optionalBoolean(document, "display.glow", false, issues, source);
+            validateMaterial(source, "display.material", material, issues);
+            validateMaterial(source, "display.locked-material", lockedMaterial, issues);
+            validateMaterial(source, "display.active-material", activeMaterial, issues);
+            return new BoosterDisplay(
+                material,
+                lockedMaterial,
+                activeMaterial,
+                customModelData == null || customModelData <= 0 ? OptionalInt.empty() : OptionalInt.of(customModelData),
+                Boolean.TRUE.equals(glow)
+            );
+        } catch (RuntimeException | IOException exception) {
+            issues.add(ConfigurationIssue.error(source, "display", "Failed to load booster display: " + exception.getMessage()));
+            return BoosterDisplay.defaults();
+        }
+    }
+
+    private static void validateMaterial(String source, String route, String value, List<ConfigurationIssue> issues) {
+        if (value == null || !MATERIAL_ID_PATTERN.matcher(value.trim().toUpperCase(Locale.ROOT)).matches()) {
+            error(issues, source, route, "Invalid material ID: " + value);
+        }
     }
 
     private BoosterDefinition loadDefinition(File file, List<ConfigurationIssue> issues) {
@@ -508,6 +549,32 @@ public final class BoosterDefinitionLoader {
         }
         String value = section.getString(route);
         return value == null ? fallback : value.trim();
+    }
+
+    private String optionalString(String source, Section section, String route, String fallback, List<ConfigurationIssue> issues) {
+        return optionalString(source, section, route, route, fallback, issues);
+    }
+
+    private Integer optionalInt(Section section, String route, Integer fallback, List<ConfigurationIssue> issues, String source) {
+        if (!section.contains(route)) {
+            return fallback;
+        }
+        if (!section.isInt(route)) {
+            error(issues, source, route, "Expected an integer value");
+            return fallback;
+        }
+        return section.getInt(route);
+    }
+
+    private Boolean optionalBoolean(Section section, String route, boolean fallback, List<ConfigurationIssue> issues, String source) {
+        if (!section.contains(route)) {
+            return fallback;
+        }
+        if (!section.isBoolean(route)) {
+            error(issues, source, route, "Expected a boolean value");
+            return fallback;
+        }
+        return section.getBoolean(route);
     }
 
     private static void error(List<ConfigurationIssue> issues, String source, String path, String message) {

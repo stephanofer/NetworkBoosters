@@ -1,0 +1,144 @@
+name:
+  default: "<dark_gray>Boosters <gray>(%page%/%max-page%)"
+  locales:
+    es: "<dark_gray>Potenciadores <gray>(%page%/%max-page%)"
+    en: "<dark_gray>Boosters <gray>(%page%/%max-page%)"
+size: 54
+patterns:
+  - networkboosters-pagination
+
+items:
+  summary:
+    type: NETWORKBOOSTERS_SUMMARY
+    slot: 4
+    item:
+      material: VAULT
+      name:
+        default: "<aqua><bold>Your Boosters"
+        locales:
+          es: "<aqua><bold>Tus Potenciadores"
+          en: "<aqua><bold>Your Boosters"
+      lore:
+        default:
+          - "<gray>Inventory: <white>%owned_total%</white>/<white>%capacity%</white>"
+          - "<gray>Active: <white>%active_count%</white>"
+          - "<gray>Queue: <white>%queue_count%</white>"
+          - "<gray>Claims: <white>%claims_count%</white>"
+        locales:
+          es:
+            - "<gray>Inventario: <white>%owned_total%</white>/<white>%capacity%</white>"
+            - "<gray>Activos: <white>%active_count%</white>"
+            - "<gray>Cola: <white>%queue_count%</white>"
+            - "<gray>Recompensas: <white>%claims_count%</white>"
+          en:
+            - "<gray>Inventory: <white>%owned_total%</white>/<white>%capacity%</white>"
+            - "<gray>Active: <white>%active_count%</white>"
+            - "<gray>Queue: <white>%queue_count%</white>"
+            - "<gray>Claims: <white>%claims_count%</white>"
+
+  filter:
+    type: NETWORKBOOSTERS_FILTER
+    slot: 45
+    item:
+      material: ECHO_SHARD
+      name:
+        default: "<aqua><bold>Filter"
+        locales:
+          es: "<aqua><bold>Filtro"
+          en: "<aqua><bold>Filter"
+      lore:
+        default:
+          - "<gray>Current: <white>%filter%</white>"
+          - "<yellow>Click to change."
+        locales:
+          es:
+            - "<gray>Actual: <white>%filter%</white>"
+            - "<yellow>Click para cambiar."
+          en:
+            - "<gray>Current: <white>%filter%</white>"
+            - "<yellow>Click to change."
+
+  sort:
+    type: NETWORKBOOSTERS_SORT
+    slot: 46
+    item:
+      material: AMETHYST_SHARD
+      name:
+        default: "<aqua><bold>Sort"
+        locales:
+          es: "<aqua><bold>Orden"
+          en: "<aqua><bold>Sort"
+      lore:
+        default:
+          - "<gray>Current: <white>%sort%</white>"
+          - "<yellow>Click to change."
+        locales:
+          es:
+            - "<gray>Actual: <white>%sort%</white>"
+            - "<yellow>Click para cambiar."
+          en:
+            - "<gray>Current: <white>%sort%</white>"
+            - "<yellow>Click to change."
+
+  claims:
+    type: NETWORKBOOSTERS_OPEN_CLAIMS
+    slot: 53
+    item:
+      material: VAULT
+      name:
+        default: "<gold><bold>Pending Claims"
+        locales:
+          es: "<gold><bold>Recompensas Pendientes"
+          en: "<gold><bold>Pending Claims"
+      lore:
+        default:
+          - "<gray>Pending: <white>%claims_count%</white>"
+          - "<yellow>Click to open."
+        locales:
+          es:
+            - "<gray>Pendientes: <white>%claims_count%</white>"
+            - "<yellow>Click para abrir."
+          en:
+            - "<gray>Pending: <white>%claims_count%</white>"
+            - "<yellow>Click to open."
+
+  owned-boosters:
+    type: NETWORKBOOSTERS_OWNED_BOOSTERS
+    empty-slot: 22
+    slots:
+      - 10-16
+      - 19-25
+      - 28-34
+    item:
+      material: TRIAL_KEY
+      name:
+        default: "<aqua><bold>%booster_id%"
+        locales:
+          es: "<aqua><bold>%booster_id%"
+          en: "<aqua><bold>%booster_id%"
+      lore:
+        default:
+          - "<gray>Amount: <white>%amount%</white>"
+          - "<gray>Multiplier: <aqua>x%multiplier%</aqua>"
+          - "<gray>Duration: <white>%duration%</white>"
+          - "<gray>State: <white>%state%</white>"
+          - ""
+          - "<yellow>Left click to activate."
+          - "<yellow>Right click to transfer."
+        locales:
+          es:
+            - "<gray>Cantidad: <white>%amount%</white>"
+            - "<gray>Multiplicador: <aqua>x%multiplier%</aqua>"
+            - "<gray>Duración: <white>%duration%</white>"
+            - "<gray>Estado: <white>%state%</white>"
+            - ""
+            - "<yellow>Click izquierdo para activar."
+            - "<yellow>Click derecho para transferir."
+          en:
+            - "<gray>Amount: <white>%amount%</white>"
+            - "<gray>Multiplier: <aqua>x%multiplier%</aqua>"
+            - "<gray>Duration: <white>%duration%</white>"
+            - "<gray>State: <white>%state%</white>"
+            - ""
+            - "<yellow>Left click to activate."
+            - "<yellow>Right click to transfer."

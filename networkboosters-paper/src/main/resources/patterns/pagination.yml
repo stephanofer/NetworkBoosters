@@ -1,0 +1,51 @@
+name: networkboosters-pagination
+size: 54
+
+items:
+  previous:
+    type: PREVIOUS
+    is-permanent: true
+    slot: 48
+    item:
+      material: RECOVERY_COMPASS
+      name:
+        default: "<aqua><bold>Previous Page"
+        locales:
+          es: "<aqua><bold>Página Anterior"
+          en: "<aqua><bold>Previous Page"
+      lore:
+        default:
+          - "<gray>Go back one page."
+        locales:
+          es:
+            - "<gray>Volvé una página."
+          en:
+            - "<gray>Go back one page."
+    else:
+      item:
+        material: GRAY_STAINED_GLASS_PANE
+        name: "<dark_gray>"
+
+  next:
+    type: NEXT
+    is-permanent: true
+    slot: 50
+    item:
+      material: RECOVERY_COMPASS
+      name:
+        default: "<aqua><bold>Next Page"
+        locales:
+          es: "<aqua><bold>Página Siguiente"
+          en: "<aqua><bold>Next Page"
+      lore:
+        default:
+          - "<gray>Go forward one page."
+        locales:
+          es:
+            - "<gray>Avanzá una página."
+          en:
+            - "<gray>Go forward one page."
+    else:
+      item:
+        material: GRAY_STAINED_GLASS_PANE
+        name: "<dark_gray>"

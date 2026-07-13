@@ -29,6 +29,11 @@ import com.stephanofer.networkboosters.config.ConfigurationSnapshot;
 import com.stephanofer.networkboosters.config.ConfigurationStore;
 import com.stephanofer.networkboosters.config.NetworkBoostersConfiguration;
 import com.stephanofer.networkboosters.localization.LocalizationService;
+import com.stephanofer.networkboosters.menu.NetworkBoostersMenuCoordinator;
+import com.stephanofer.networkboosters.menu.loader.ClaimsButtonLoader;
+import com.stephanofer.networkboosters.menu.loader.OwnedBoostersButtonLoader;
+import com.stephanofer.networkboosters.menu.loader.SimpleMenuButtonLoader;
+import com.stephanofer.networkboosters.menu.loader.TransferTargetsButtonLoader;
 import com.stephanofer.networkboosters.placeholder.NetworkBoostersPlaceholderExpansion;
 import com.stephanofer.networkboosters.event.BoosterEventDispatcher;
 import com.stephanofer.networkboosters.inventory.InventoryMutationService;
@@ -100,6 +105,7 @@ public final class NetworkBoostersLifecycle implements Listener, NetworkBoosters
     private BoosterInvalidationSubscriber invalidationSubscriber;
     private RevisionReconciliationCoordinator reconciliationCoordinator;
     private NetworkBoostersPlaceholderExpansion placeholderExpansion;
+    private NetworkBoostersMenuCoordinator menuCoordinator;
     private RedisClient redis;
     private RedisStatusRegistration redisStatusRegistration;
     private RedisSubscription redisProbeSubscription;
@@ -306,6 +312,15 @@ public final class NetworkBoostersLifecycle implements Listener, NetworkBoosters
             return "unavailable";
         }
         return this.redis.operationalStatus().state().name().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    @Override
+    public boolean openMenu(Player player) {
+        if (this.menuCoordinator == null || this.state.get() != LifecycleState.RUNNING) {
+            return false;
+        }
+        this.menuCoordinator.openMain(player);
+        return true;
     }
 
     @Override
@@ -548,11 +563,34 @@ public final class NetworkBoostersLifecycle implements Listener, NetworkBoosters
     private void startZMenu() {
         long started = System.nanoTime();
         this.zmenu = ZMenus.require(this.plugin);
+        this.menuCoordinator = new NetworkBoostersMenuCoordinator(this, this.zmenu);
         this.zmenu.bootstrap()
+            .buttons(registry -> {
+                registry.button(new OwnedBoostersButtonLoader(this.plugin, this.menuCoordinator));
+                registry.button(new TransferTargetsButtonLoader(this.plugin, this.menuCoordinator));
+                registry.button(new ClaimsButtonLoader(this.plugin, this.menuCoordinator));
+                registry.button(SimpleMenuButtonLoader.summary(this.plugin, this.menuCoordinator));
+                registry.button(SimpleMenuButtonLoader.filter(this.plugin, this.menuCoordinator));
+                registry.button(SimpleMenuButtonLoader.sort(this.plugin, this.menuCoordinator));
+                registry.button(SimpleMenuButtonLoader.openClaims(this.plugin, this.menuCoordinator));
+                registry.button(SimpleMenuButtonLoader.activationPreview(this.plugin, this.menuCoordinator));
+                registry.button(SimpleMenuButtonLoader.activationConfirm(this.plugin, this.menuCoordinator));
+                registry.button(SimpleMenuButtonLoader.transferPreview(this.plugin, this.menuCoordinator));
+                registry.button(SimpleMenuButtonLoader.transferAmount(this.plugin, this.menuCoordinator));
+                registry.button(SimpleMenuButtonLoader.transferConfirm(this.plugin, this.menuCoordinator));
+            })
+            .defaultInventories(
+                "inventories/boosters.yml",
+                "inventories/booster-confirm.yml",
+                "inventories/booster-transfer-target.yml",
+                "inventories/booster-transfer.yml",
+                "inventories/booster-claims.yml"
+            )
+            .defaultPatterns("patterns/pagination.yml")
             .patterns("patterns")
             .inventories("inventories")
             .load();
-        this.zmenu.reload();
+        this.plugin.getServer().getPluginManager().registerEvents(this.menuCoordinator, this.plugin);
         this.logger.info("zMenu integration loaded and reload verified in {} ms", elapsedMillis(started));
     }
 
@@ -668,6 +706,13 @@ public final class NetworkBoostersLifecycle implements Listener, NetworkBoosters
             if (this.transferService != null) {
                 this.transferService.close();
                 this.transferService = null;
+            }
+        });
+        closeFailure = close("NetworkBoosters menu coordinator", closeFailure, () -> {
+            if (this.menuCoordinator != null) {
+                HandlerList.unregisterAll(this.menuCoordinator);
+                this.menuCoordinator.close();
+                this.menuCoordinator = null;
             }
         });
         closeFailure = close("Player snapshot cache", closeFailure, () -> {

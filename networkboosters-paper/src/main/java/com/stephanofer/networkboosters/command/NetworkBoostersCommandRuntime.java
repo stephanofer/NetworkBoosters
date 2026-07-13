@@ -34,6 +34,8 @@ public interface NetworkBoostersCommandRuntime {
 
     CompletableFuture<ReloadReport> reload();
 
+    boolean openMenu(Player player);
+
     String redisStatus();
 
     boolean isRunning();

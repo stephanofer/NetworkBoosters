@@ -1,0 +1,45 @@
+name:
+  default: "<dark_gray>Pending claims <gray>(%page%/%max-page%)"
+  locales:
+    es: "<dark_gray>Recompensas pendientes <gray>(%page%/%max-page%)"
+    en: "<dark_gray>Pending claims <gray>(%page%/%max-page%)"
+size: 54
+patterns:
+  - networkboosters-pagination
+
+items:
+  claims:
+    type: NETWORKBOOSTERS_CLAIMS
+    empty-slot: 22
+    slots:
+      - 10-16
+      - 19-25
+      - 28-34
+    item:
+      material: VAULT
+      name:
+        default: "<gold>%booster_id% x%amount%"
+        locales:
+          es: "<gold>%booster_id% x%amount%"
+          en: "<gold>%booster_id% x%amount%"
+      lore:
+        default:
+          - "<gray>Claim: <white>%claim_id%</white>"
+          - "<yellow>Click to claim."
+        locales:
+          es:
+            - "<gray>Recompensa: <white>%claim_id%</white>"
+            - "<yellow>Click para reclamar."
+          en:
+            - "<gray>Claim: <white>%claim_id%</white>"
+            - "<yellow>Click to claim."
+  back:
+    type: BACK
+    slot: 49
+    item:
+      material: RED_BUNDLE
+      name:
+        default: "<red>Back"
+        locales:
+          es: "<red>Volver"
+          en: "<red>Back"

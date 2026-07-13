@@ -101,8 +101,9 @@ public final class NetworkBoostersCommands {
     }
 
     private void registerRoot(PaperCommandManager.Bootstrapped<CommandSourceStack> manager, String root) {
-        manager.command(manager.commandBuilder(root).permission("networkboosters.command.open").handler(context -> this.summary(context.sender().getSender())));
+        manager.command(manager.commandBuilder(root).permission("networkboosters.command.open").handler(context -> this.openOrSummary(context.sender().getSender())));
         manager.command(manager.commandBuilder(root).literal("help").permission("networkboosters.command.open").handler(context -> this.help(context.sender().getSender())));
+        manager.command(manager.commandBuilder(root).literal("menu").permission("networkboosters.command.open").handler(context -> this.openOrSummary(context.sender().getSender())));
         manager.command(manager.commandBuilder(root).literal("list").optional("page", stringParser()).permission("networkboosters.command.list").handler(context -> this.list(context.sender().getSender(), context.getOrDefault("page", "1"))));
         manager.command(manager.commandBuilder(root).literal("active").permission("networkboosters.command.list").handler(context -> this.active(context.sender().getSender())));
         manager.command(manager.commandBuilder(root).literal("queue").optional("group", stringParser()).permission("networkboosters.command.list").handler(context -> this.queue(context.sender().getSender(), context.getOrDefault("group", ""))));
@@ -224,6 +225,14 @@ public final class NetworkBoostersCommands {
             send(sender, runtime, MessageKey.SUMMARY_QUEUED, MessageArguments.text("amount", queued));
             send(sender, runtime, MessageKey.SUMMARY_CLAIMS, MessageArguments.text("amount", snapshot.pendingClaims().size()));
             send(sender, runtime, MessageKey.SUMMARY_HINT);
+        });
+    }
+
+    private void openOrSummary(CommandSender sender) {
+        this.withPlayerRuntime(sender, (runtime, player) -> {
+            if (!runtime.openMenu(player)) {
+                this.summary(sender);
+            }
         });
     }
 

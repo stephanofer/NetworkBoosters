@@ -31,3 +31,8 @@ transfer:
 display:
   order: 100
   category: points
+  material: TRIAL_KEY
+  locked-material: OMINOUS_TRIAL_KEY
+  active-material: HEAVY_CORE
+  custom-model-data: 0
+  glow: false

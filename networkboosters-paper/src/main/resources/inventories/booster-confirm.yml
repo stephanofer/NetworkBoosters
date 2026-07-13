@@ -1,0 +1,60 @@
+name:
+  default: "<dark_gray>Confirm activation"
+  locales:
+    es: "<dark_gray>Confirmar activación"
+    en: "<dark_gray>Confirm activation"
+size: 27
+
+items:
+  confirm:
+    type: NETWORKBOOSTERS_ACTIVATION_CONFIRM
+    slots:
+      - 0-2
+      - 9-11
+      - 18-20
+    item:
+      material: LIME_BUNDLE
+      name:
+        default: "<green><bold>Activate"
+        locales:
+          es: "<green><bold>Activar"
+          en: "<green><bold>Activate"
+      lore:
+        default:
+          - "<gray>This action consumes one unit."
+        locales:
+          es:
+            - "<gray>Esta acción consume una unidad."
+          en:
+            - "<gray>This action consumes one unit."
+  preview:
+    type: NETWORKBOOSTERS_ACTIVATION_PREVIEW
+    slot: 13
+    item:
+      material: WIND_CHARGE
+      name:
+        default: "<aqua>%booster_id%"
+        locales:
+          es: "<aqua>%booster_id%"
+          en: "<aqua>%booster_id%"
+      lore:
+        default:
+          - "<gray>Time continues while offline."
+        locales:
+          es:
+            - "<gray>El tiempo continúa aunque te desconectes."
+          en:
+            - "<gray>Time continues while offline."
+  cancel:
+    type: BACK
+    slots:
+      - 6-8
+      - 15-17
+      - 24-26
+    item:
+      material: RED_BUNDLE
+      name:
+        default: "<red><bold>Cancel"
+        locales:
+          es: "<red><bold>Cancelar"
+          en: "<red><bold>Cancel"

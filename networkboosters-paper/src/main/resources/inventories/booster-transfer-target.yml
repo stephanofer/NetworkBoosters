@@ -1,0 +1,42 @@
+name:
+  default: "<dark_gray>Select recipient"
+  locales:
+    es: "<dark_gray>Elegir receptor"
+    en: "<dark_gray>Select recipient"
+size: 54
+patterns:
+  - networkboosters-pagination
+
+items:
+  targets:
+    type: NETWORKBOOSTERS_TRANSFER_TARGETS
+    empty-slot: 22
+    slots:
+      - 10-16
+      - 19-25
+      - 28-34
+    item:
+      material: PLAYER_HEAD
+      name:
+        default: "<aqua>%target%"
+        locales:
+          es: "<aqua>%target%"
+          en: "<aqua>%target%"
+      lore:
+        default:
+          - "<yellow>Click to select."
+        locales:
+          es:
+            - "<yellow>Click para elegir."
+          en:
+            - "<yellow>Click to select."
+  back:
+    type: BACK
+    slot: 49
+    item:
+      material: RED_BUNDLE
+      name:
+        default: "<red>Back"
+        locales:
+          es: "<red>Volver"
+          en: "<red>Back"

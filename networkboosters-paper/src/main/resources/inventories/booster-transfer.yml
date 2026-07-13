@@ -1,0 +1,74 @@
+name:
+  default: "<dark_gray>Confirm transfer"
+  locales:
+    es: "<dark_gray>Confirmar transferencia"
+    en: "<dark_gray>Confirm transfer"
+size: 27
+
+items:
+  minus:
+    type: NETWORKBOOSTERS_TRANSFER_AMOUNT
+    delta: -1
+    slot: 10
+    item:
+      material: RED_BUNDLE
+      name:
+        default: "<red>-1"
+        locales:
+          es: "<red>-1"
+          en: "<red>-1"
+  preview:
+    type: NETWORKBOOSTERS_TRANSFER_PREVIEW
+    slot: 13
+    item:
+      material: BUNDLE
+      name:
+        default: "<aqua>%booster_id% x%amount%"
+        locales:
+          es: "<aqua>%booster_id% x%amount%"
+          en: "<aqua>%booster_id% x%amount%"
+      lore:
+        default:
+          - "<gray>Recipient: <white>%target%</white>"
+        locales:
+          es:
+            - "<gray>Receptor: <white>%target%</white>"
+          en:
+            - "<gray>Recipient: <white>%target%</white>"
+  plus:
+    type: NETWORKBOOSTERS_TRANSFER_AMOUNT
+    delta: 1
+    slot: 16
+    item:
+      material: LIME_BUNDLE
+      name:
+        default: "<green>+1"
+        locales:
+          es: "<green>+1"
+          en: "<green>+1"
+  confirm:
+    type: NETWORKBOOSTERS_TRANSFER_CONFIRM
+    slots:
+      - 0-2
+      - 9
+      - 18-20
+    item:
+      material: LIME_BUNDLE
+      name:
+        default: "<green><bold>Transfer"
+        locales:
+          es: "<green><bold>Transferir"
+          en: "<green><bold>Transfer"
+  cancel:
+    type: BACK
+    slots:
+      - 6-8
+      - 17
+      - 24-26
+    item:
+      material: RED_BUNDLE
+      name:
+        default: "<red><bold>Cancel"
+        locales:
+          es: "<red><bold>Cancelar"
+          en: "<red><bold>Cancel"
