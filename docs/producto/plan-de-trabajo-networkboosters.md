@@ -1,5 +1,7 @@
 # Plan de trabajo de NetworkBoosters
 
+> Plan histórico de implementación. La referencia vigente para consumidores está en la [documentación de NetworkBoosters](networkboosters/README.md).
+
 > Estado: listo para ejecución  
 > Propósito: organizar la implementación completa en bloques secuenciales  
 > Fuente de verdad: [Diseño final de NetworkBoosters](./diseno-final-networkboosters.md)

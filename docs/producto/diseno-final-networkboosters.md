@@ -1,5 +1,7 @@
 # Diseño final de NetworkBoosters
 
+> Documento de diseño histórico. Para integrar plugins consumidores con la versión implementada `1.0.0`, consultar la [documentación de NetworkBoosters](networkboosters/README.md).
+
 > Estado: aprobado y listo para implementación  
 > Alcance: diseño funcional, técnico, operativo y de integración  
 > Plataforma inicial: Paper 26.1.2, Java 25
