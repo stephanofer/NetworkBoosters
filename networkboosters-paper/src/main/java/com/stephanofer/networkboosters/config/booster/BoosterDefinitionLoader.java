@@ -91,7 +91,7 @@ public final class BoosterDefinitionLoader {
             definitions.put(definition.id(), definition);
             displays.put(definition.id(), this.display(relative(entry), definition.id(), entry, issues));
 
-            if (!BoosterTarget.NETWORK_PROGRESSION_POINTS.equals(definition.target())) {
+            if (!BoosterTarget.NETWORK_POINTS.equals(definition.target())) {
                 issues.add(ConfigurationIssue.warning(relative(entry), "target", "No built-in consumer is currently known for target " + definition.target()));
             }
         }

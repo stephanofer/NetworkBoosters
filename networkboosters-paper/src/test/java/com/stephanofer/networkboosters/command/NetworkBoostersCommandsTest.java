@@ -136,7 +136,7 @@ final class NetworkBoostersCommandsTest {
     ) {
         return new BoosterDefinition(
             id,
-            BoosterTarget.NETWORK_PROGRESSION_POINTS,
+            BoosterTarget.NETWORK_POINTS,
             BigDecimal.valueOf(2),
             Duration.ofHours(1),
             BoosterScope.personalGlobal(),

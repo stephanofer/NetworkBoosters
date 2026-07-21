@@ -160,7 +160,7 @@ class BoosterTransferServiceTest {
     private static BoosterDefinition definition(BoosterId boosterId) {
         return new BoosterDefinition(
             boosterId,
-            BoosterTarget.NETWORK_PROGRESSION_POINTS,
+            BoosterTarget.NETWORK_POINTS,
             BigDecimal.valueOf(2),
             Duration.ofHours(1),
             BoosterScope.personalGlobal(),

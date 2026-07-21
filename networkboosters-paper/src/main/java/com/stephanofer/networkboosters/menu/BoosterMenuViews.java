@@ -4,6 +4,7 @@ import com.stephanofer.networkboosters.api.booster.ActiveBooster;
 import com.stephanofer.networkboosters.api.booster.BoosterDefinition;
 import com.stephanofer.networkboosters.api.booster.BoosterId;
 import com.stephanofer.networkboosters.api.booster.BoosterScope;
+import com.stephanofer.networkboosters.api.booster.BoosterTarget;
 import com.stephanofer.networkboosters.api.player.PlayerBoostSnapshot;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -141,7 +142,7 @@ public final class BoosterMenuViews {
             case ALL -> ignored -> true;
             case ACTIVE -> view -> view.active().map(active -> active.boosterId().equals(view.boosterId())).orElse(false) || view.state() == BoosterVisualState.EXTENDABLE;
             case CURRENT_CONTEXT -> OwnedBoosterView::applicableNow;
-            case POINTS -> view -> view.definition().map(definition -> definition.target().key().equals("network_progression:points")).orElse(false);
+            case POINTS -> view -> view.definition().map(definition -> definition.target().equals(BoosterTarget.NETWORK_POINTS)).orElse(false);
             case LOCKED -> view -> view.state() == BoosterVisualState.BLOCKED_PERMISSION;
             case TRANSFERABLE -> OwnedBoosterView::transferable;
         };

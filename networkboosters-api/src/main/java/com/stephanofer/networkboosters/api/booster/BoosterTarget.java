@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 public record BoosterTarget(String key) {
 
     private static final Pattern PATTERN = Pattern.compile("[a-z0-9][a-z0-9._-]{0,63}:[a-z0-9][a-z0-9/._-]{0,127}");
-    public static final BoosterTarget NETWORK_PROGRESSION_POINTS = new BoosterTarget("network_progression:points");
+    public static final BoosterTarget NETWORK_POINTS = new BoosterTarget("network_points:points");
 
     public BoosterTarget {
         key = normalize(key);

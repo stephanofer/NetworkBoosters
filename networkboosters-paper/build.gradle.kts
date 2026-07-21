@@ -109,7 +109,8 @@ tasks {
                 "paper-plugin.yml",
                 "com/stephanofer/networkboosters/NetworkBoostersPlugin.class",
                 "com/stephanofer/networkboosters/NetworkBoostersBootstrap.class",
-                "com/stephanofer/networkboosters/NetworkBoostersLoader.class"
+                "com/stephanofer/networkboosters/NetworkBoostersLoader.class",
+                "com/stephanofer/networkboosters/api/NetworkBoostersService.class"
             )
 
             val missingEntries = requiredEntries.filterNot(entries::contains)

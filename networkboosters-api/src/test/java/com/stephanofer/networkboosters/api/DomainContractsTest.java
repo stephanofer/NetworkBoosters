@@ -57,9 +57,9 @@ class DomainContractsTest {
 
     @Test
     void targetsRequireNamespacedKeys() {
-        assertEquals("network_progression:points", BoosterTarget.of("Network_Progression:Points").key());
+        assertEquals("network_points:points", BoosterTarget.of("Network_Points:Points").key());
         assertThrows(IllegalArgumentException.class, () -> BoosterTarget.of("points"));
-        assertThrows(IllegalArgumentException.class, () -> BoosterTarget.of("network progression:points"));
+        assertThrows(IllegalArgumentException.class, () -> BoosterTarget.of("network points:points"));
     }
 
     @Test
@@ -192,7 +192,7 @@ class DomainContractsTest {
     private static BoosterDefinition definition(BigDecimal multiplier, Duration duration) {
         return new BoosterDefinition(
             BoosterId.of("personal_points_x2"),
-            BoosterTarget.NETWORK_PROGRESSION_POINTS,
+            BoosterTarget.NETWORK_POINTS,
             multiplier,
             duration,
             BoosterScope.personalGlobal(),
@@ -210,7 +210,7 @@ class DomainContractsTest {
             UUID.randomUUID(),
             playerId,
             BoosterId.of("personal_points_x2"),
-            BoosterTarget.NETWORK_PROGRESSION_POINTS,
+            BoosterTarget.NETWORK_POINTS,
             BigDecimal.valueOf(2),
             group,
             ConflictPolicy.QUEUE,
@@ -227,7 +227,7 @@ class DomainContractsTest {
             UUID.randomUUID(),
             playerId,
             BoosterId.of("personal_points_x2"),
-            BoosterTarget.NETWORK_PROGRESSION_POINTS,
+            BoosterTarget.NETWORK_POINTS,
             BigDecimal.valueOf(2),
             group,
             ConflictPolicy.QUEUE,

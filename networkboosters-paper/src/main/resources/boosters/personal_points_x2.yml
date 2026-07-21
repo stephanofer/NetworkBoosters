@@ -3,7 +3,7 @@ config-version: 1
 id: personal_points_x2
 enabled: true
 
-target: network_progression:points
+target: network_points:points
 multiplier: 2.0
 duration: 2h
 

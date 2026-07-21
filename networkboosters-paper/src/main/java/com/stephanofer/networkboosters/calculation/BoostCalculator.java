@@ -70,4 +70,18 @@ public final class BoostCalculator {
             capped
         );
     }
+
+    public BoostCalculation calculate(
+        PlayerBoostSnapshot snapshot,
+        BoostRequest request,
+        Instant now,
+        BigDecimal maximumMultiplier
+    ) {
+        Objects.requireNonNull(snapshot, "snapshot");
+        Objects.requireNonNull(request, "request");
+        if (!snapshot.playerId().equals(request.playerId())) {
+            throw new IllegalArgumentException("Snapshot player does not match request player");
+        }
+        return calculate(Optional.of(snapshot), request, now, maximumMultiplier);
+    }
 }

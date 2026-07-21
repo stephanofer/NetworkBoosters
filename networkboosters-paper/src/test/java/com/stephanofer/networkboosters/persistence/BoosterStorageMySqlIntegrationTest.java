@@ -383,7 +383,7 @@ class BoosterStorageMySqlIntegrationTest {
             activationId,
             playerId,
             BoosterId.of("personal_points_x2"),
-            BoosterTarget.NETWORK_PROGRESSION_POINTS,
+            BoosterTarget.NETWORK_POINTS,
             BigDecimal.valueOf(2),
             ActivationGroup.of("personal-points"),
             ConflictPolicy.QUEUE,
@@ -399,7 +399,7 @@ class BoosterStorageMySqlIntegrationTest {
     private static BoosterDefinition definition(BoosterId boosterId) {
         return new BoosterDefinition(
             boosterId,
-            BoosterTarget.NETWORK_PROGRESSION_POINTS,
+            BoosterTarget.NETWORK_POINTS,
             BigDecimal.valueOf(2),
             Duration.ofHours(2),
             BoosterScope.personalGlobal(),

@@ -8,7 +8,7 @@
 
 NetworkBoosters será la plataforma central de modificadores temporales de HERA Network. Su responsabilidad es administrar boosters poseídos, activaciones, colas, transferencias, límites de inventario, sincronización entre servidores y una API pública de evaluación para otros plugins.
 
-El primer caso de uso será un booster personal que multiplica los points entregados por NetworkProgression. El diseño no queda acoplado a points: nuevos recursos como experiencia o monedas podrán integrarse mediante targets estables sin modificar el núcleo del sistema.
+El primer caso de uso será un booster personal que multiplica los points entregados por NetworkPoints. El diseño no queda acoplado a points: nuevos recursos como experiencia o monedas podrán integrarse mediante targets estables sin modificar el núcleo del sistema.
 
 Este documento consolida las decisiones aprobadas. No presenta alternativas pendientes. Cualquier cambio posterior deberá tratarse como una modificación explícita del diseño.
 
@@ -19,7 +19,7 @@ NetworkBoosters debe:
 - aumentar el tiempo de juego y crear incentivos de progresión y monetización;
 - permitir que jugadores posean, consulten, activen y transfieran boosters;
 - permitir boosters normales y boosters cuya activación requiera permisos de rango;
-- ofrecer una API pública pequeña, estable y eficiente para NetworkProgression y futuros consumidores;
+- ofrecer una API pública pequeña, estable y eficiente para NetworkPoints y futuros consumidores;
 - evaluar recompensas sin I/O, bloqueos ni acceso a base de datos durante gameplay;
 - mantener el estado correcto al cambiar de servidor, desconectarse, reiniciar o sufrir una caída;
 - ofrecer comandos, menús, autocompletado, eventos Paper y PlaceholderAPI;
@@ -32,7 +32,7 @@ NetworkBoosters debe:
 La primera versión funcional incluye:
 
 - boosters personales;
-- target `network_progression:points`;
+- target `network_points:points`;
 - multiplicadores configurables;
 - inventario de boosters por jugador;
 - límites totales de inventario determinados por permisos;
@@ -69,7 +69,7 @@ MySQL conserva inventarios, activaciones, colas, transferencias, recompensas pen
 
 ### 3.2 El hot path no realiza I/O
 
-La evaluación de un reward usa exclusivamente snapshots inmutables en memoria. NetworkProgression nunca consulta MySQL o Redis para otorgar points.
+La evaluación de un reward usa exclusivamente snapshots inmutables en memoria. NetworkPoints nunca consulta MySQL o Redis para otorgar points.
 
 ### 3.3 El tiempo es absoluto
 
@@ -157,7 +157,7 @@ public record BoosterTarget(String key) {}
 El primer target es:
 
 ```text
-network_progression:points
+network_points:points
 ```
 
 Se usa una clave namespaced en lugar de un enum cerrado para permitir que futuros plugins integren nuevos recursos sin cambiar el núcleo.
@@ -684,6 +684,10 @@ public interface NetworkBoostersService {
 
     BoostCalculation calculate(BoostRequest request);
 
+    Optional<BoostCalculation> calculateIfReady(BoostRequest request);
+
+    BoostCalculation calculate(BoostRequest request, PlayerBoostSnapshot snapshot);
+
     CompletableFuture<ActivationResult> activate(
         UUID playerId,
         BoosterId boosterId,
@@ -722,7 +726,7 @@ public interface NetworkBoostersService {
 
 ### 12.2 Threading
 
-- `calculate`, `cached`, `getCachedOrEmpty`, `definition` y `definitions` son síncronos, thread-safe y sin I/O;
+- `calculate`, `calculateIfReady`, `cached`, `getCachedOrEmpty`, `definition` y `definitions` son síncronos, thread-safe y sin I/O;
 - cargas y mutaciones son async;
 - no se usa `.join()` o `.get()` en comandos, eventos o gameplay;
 - las colecciones y snapshots públicos son inmutables;
@@ -734,13 +738,13 @@ public interface NetworkBoostersService {
 
 ### 12.4 Evaluación de recompensas
 
-NetworkProgression no pregunta solo si existe un booster. Solicita el cálculo completo:
+NetworkPoints obtiene el cálculo y el readiness del snapshot en una sola operación:
 
 ```java
-BoostCalculation calculation = boosters.calculate(
+Optional<BoostCalculation> calculation = boosters.calculateIfReady(
     BoostRequest.of(
         playerId,
-        "network_progression:points",
+        BoosterTarget.NETWORK_POINTS,
         BigDecimal.valueOf(10),
         "skywars",
         serverId
@@ -1118,7 +1122,7 @@ config-version: 1
 id: personal_points_x3
 enabled: true
 
-target: network_progression:points
+target: network_points:points
 multiplier: 3.0
 duration: 2h
 
@@ -1760,14 +1764,14 @@ Logs útiles y sin spam:
 17. Añadir warnings y actualización visual.
 18. Añadir tests unitarios e integración MySQL.
 19. Documentar API de consumo.
-20. Integrar NetworkProgression con `10 points -> 20 points`.
+20. Integrar NetworkPoints con `10 points -> 20 points`.
 21. Ejecutar pruebas de concurrencia, reinicio y Redis degradado.
 
 ## 33. Criterios de aceptación
 
 El sistema está listo cuando:
 
-- NetworkProgression obtiene el resultado mediante una llamada síncrona sin I/O;
+- NetworkPoints obtiene readiness y cálculo mediante una llamada síncrona sin I/O;
 - un jugador puede recibir, consultar, activar, extender, encolar y transferir boosters;
 - los boosters bloqueados comunican su rango y no se activan sin permiso;
 - capacidad total se resuelve por permisos y no existen límites por booster;

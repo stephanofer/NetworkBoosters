@@ -298,7 +298,7 @@ class ConfigurationLoaderTest {
             config-version: 1
             id: %s
             enabled: true
-            target: network_progression:points
+            target: network_points:points
             multiplier: %s
             duration: 2h
             scope:

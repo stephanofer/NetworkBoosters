@@ -40,9 +40,22 @@ public interface NetworkBoostersService {
     boolean isReady(UUID playerId);
 
     /**
-     * Synchronous, thread-safe and I/O-free. Consumers must not expect this method to load state.
+     * Synchronous, thread-safe and I/O-free. Returns a neutral calculation when no snapshot is ready.
+     * Consumers that must distinguish missing state should use {@link #calculateIfReady(BoostRequest)}.
      */
     BoostCalculation calculate(BoostRequest request);
+
+    /**
+     * Synchronous, thread-safe and I/O-free. Acquires the cached snapshot once and returns empty when
+     * no player snapshot is ready.
+     */
+    Optional<BoostCalculation> calculateIfReady(BoostRequest request);
+
+    /**
+     * Synchronous, thread-safe and I/O-free calculation against a caller-owned snapshot. The request
+     * and snapshot must belong to the same player.
+     */
+    BoostCalculation calculate(BoostRequest request, PlayerBoostSnapshot snapshot);
 
     CompletableFuture<ActivationResult> activate(ActivationRequest request);
 

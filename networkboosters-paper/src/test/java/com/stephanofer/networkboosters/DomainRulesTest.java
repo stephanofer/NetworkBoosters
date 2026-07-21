@@ -104,7 +104,7 @@ class DomainRulesTest {
 
         BoostCalculation calculation = new BoostCalculator().calculate(
             Optional.of(snapshot),
-            BoostRequest.of(PLAYER_ID, BoosterTarget.NETWORK_PROGRESSION_POINTS, BigDecimal.TEN, "skywars", "sw-01"),
+            BoostRequest.of(PLAYER_ID, BoosterTarget.NETWORK_POINTS, BigDecimal.TEN, "skywars", "sw-01"),
             NOW,
             BigDecimal.valueOf(5));
 
@@ -114,9 +114,19 @@ class DomainRulesTest {
         assertTrue(calculation.capped());
         assertEquals(BigDecimal.TEN.negate(), new BoostCalculator().calculate(
             Optional.of(snapshot),
-            BoostRequest.of(PLAYER_ID, BoosterTarget.NETWORK_PROGRESSION_POINTS, BigDecimal.TEN.negate(), "skywars", "sw-01"),
+            BoostRequest.of(PLAYER_ID, BoosterTarget.NETWORK_POINTS, BigDecimal.TEN.negate(), "skywars", "sw-01"),
             NOW,
             BigDecimal.valueOf(5)).finalAmount());
+        assertEquals(new BigDecimal("50"), new BoostCalculator().calculate(
+            snapshot,
+            BoostRequest.of(PLAYER_ID, BoosterTarget.NETWORK_POINTS, BigDecimal.TEN, "skywars", "sw-01"),
+            NOW,
+            BigDecimal.valueOf(5)).finalAmount());
+        assertThrows(IllegalArgumentException.class, () -> new BoostCalculator().calculate(
+            snapshot,
+            BoostRequest.of(UUID.randomUUID(), BoosterTarget.NETWORK_POINTS, BigDecimal.TEN, "skywars", "sw-01"),
+            NOW,
+            BigDecimal.valueOf(5)));
     }
 
     @Test
@@ -297,7 +307,7 @@ class DomainRulesTest {
     private static BoosterDefinition definition(BoosterId boosterId, BigDecimal multiplier, ConflictPolicy policy) {
         return new BoosterDefinition(
             boosterId,
-            BoosterTarget.NETWORK_PROGRESSION_POINTS,
+            BoosterTarget.NETWORK_POINTS,
             multiplier,
             Duration.ofHours(2),
             BoosterScope.personalGlobal(),
@@ -323,7 +333,7 @@ class DomainRulesTest {
             activationId,
             PLAYER_ID,
             boosterId,
-            BoosterTarget.NETWORK_PROGRESSION_POINTS,
+            BoosterTarget.NETWORK_POINTS,
             multiplier,
             group,
             ConflictPolicy.QUEUE,

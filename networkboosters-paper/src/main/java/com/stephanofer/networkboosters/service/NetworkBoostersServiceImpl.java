@@ -106,6 +106,22 @@ public final class NetworkBoostersServiceImpl implements NetworkBoostersService 
     }
 
     @Override
+    public Optional<BoostCalculation> calculateIfReady(BoostRequest request) {
+        Objects.requireNonNull(request, "request");
+        return this.snapshots.cached(request.playerId()).map(snapshot -> this.calculate(request, snapshot));
+    }
+
+    @Override
+    public BoostCalculation calculate(BoostRequest request, PlayerBoostSnapshot snapshot) {
+        return this.calculator.calculate(
+            snapshot,
+            request,
+            this.clock.instant(),
+            this.configurationStore.requireCurrent().configuration().limits().maximumMultiplier()
+        );
+    }
+
+    @Override
     public CompletableFuture<ActivationResult> activate(ActivationRequest request) {
         return this.activationMutations.activate(request);
     }

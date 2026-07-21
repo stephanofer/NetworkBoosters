@@ -31,12 +31,12 @@ final class BoosterTimelineViewsTest {
         ActivationGroup group = ActivationGroup.of("points");
         Instant now = Instant.parse("2026-07-13T12:00:00Z");
         ActiveBooster active = new ActiveBooster(
-            UUID.randomUUID(), playerId, BoosterId.of("x2"), BoosterTarget.NETWORK_PROGRESSION_POINTS,
+            UUID.randomUUID(), playerId, BoosterId.of("x2"), BoosterTarget.NETWORK_POINTS,
             BigDecimal.valueOf(2), group, ConflictPolicy.QUEUE, BoosterScope.personalGlobal(), ActivationRequirements.NONE,
             now.minusSeconds(60), now.plusSeconds(120), ActivationSource.PLAYER_MENU, SourceReference.none()
         );
         QueuedBooster queued = new QueuedBooster(
-            UUID.randomUUID(), playerId, BoosterId.of("x3"), BoosterTarget.NETWORK_PROGRESSION_POINTS,
+            UUID.randomUUID(), playerId, BoosterId.of("x3"), BoosterTarget.NETWORK_POINTS,
             BigDecimal.valueOf(3), group, ConflictPolicy.QUEUE, BoosterScope.personalGlobal(), ActivationRequirements.NONE,
             Duration.ofMinutes(5), now, ActivationSource.PLAYER_MENU, SourceReference.none(), 0
         );

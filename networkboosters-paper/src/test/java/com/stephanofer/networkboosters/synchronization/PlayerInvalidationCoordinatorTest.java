@@ -132,7 +132,7 @@ final class PlayerInvalidationCoordinatorTest {
             activationId,
             playerId,
             BoosterId.of("personal_points_x2"),
-            new BoosterTarget("network_progression:points"),
+            new BoosterTarget("network_points:points"),
             BigDecimal.valueOf(2),
             new ActivationGroup("points"),
             ConflictPolicy.QUEUE,

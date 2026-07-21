@@ -112,7 +112,7 @@ final class BoosterMenuViewsTest {
     private static BoosterDefinition definition(BoosterId id, int order, ActivationRequirements requirements) {
         return new BoosterDefinition(
             id,
-            BoosterTarget.of("network_progression:points"),
+            BoosterTarget.of("network_points:points"),
             BigDecimal.valueOf(2),
             Duration.ofHours(2),
             BoosterScope.personalGlobal(),

@@ -42,7 +42,7 @@ Consumer plugins must integrate through `networkboosters-api`. They must not dep
 | Optional plugin | PlaceholderAPI |
 | Public API artifact | `com.stephanofer:networkboosters-api:1.0.0` |
 
-Version `1.0.0` supports personal boosters. The built-in reward consumer targets `network_progression:points`; other namespaced targets can be handled by plugins through the calculation API.
+Version `1.0.0` supports personal boosters. The built-in reward consumer targets `network_points:points`; other namespaced targets can be handled by plugins through the calculation API.
 
 ## Build
 
