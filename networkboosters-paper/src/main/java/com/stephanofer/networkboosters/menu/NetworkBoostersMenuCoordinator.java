@@ -192,24 +192,26 @@ public final class NetworkBoostersMenuCoordinator implements Listener, AutoClose
     }
 
     public void confirmActivation(Player player) {
+        UUID playerId = player.getUniqueId();
+        if (this.activeOperations.putIfAbsent(playerId, true) != null) {
+            return;
+        }
         Optional<PendingActivation> pending = this.pendingActivation(player);
         if (pending.isEmpty()) {
+            this.activeOperations.remove(playerId);
             this.send(player, MessageKey.ACTIVATION_DEFINITION_CHANGED);
             this.openMain(player);
             return;
         }
         PendingActivation activation = pending.orElseThrow();
-        if (this.activeOperations.putIfAbsent(player.getUniqueId(), true) != null) {
-            return;
-        }
-        this.sessions.update(player.getUniqueId(), MenuSession::clearPending);
-        this.runtime.service().activate(new ActivationRequest(player.getUniqueId(), activation.boosterId(), ActivationSource.PLAYER_MENU, this.reference(player, "menu-activate")))
+        this.sessions.update(playerId, MenuSession::clearPending);
+        player.closeInventory();
+        this.runtime.service().activate(new ActivationRequest(playerId, activation.boosterId(), ActivationSource.PLAYER_MENU, this.reference(player, "menu-activate")))
             .whenComplete((result, failure) -> this.sync(player, () -> {
-                this.activeOperations.remove(player.getUniqueId());
+                this.activeOperations.remove(playerId);
                 this.sendActivation(player, activation.boosterId(), result, failure);
-                this.runtime.service().refresh(player.getUniqueId());
-                this.sessions.update(player.getUniqueId(), session -> session.withFilter(activation.returnFilter()).withSort(activation.returnSort()).withPage(activation.returnPage()));
-                this.openMain(player);
+                this.runtime.service().refresh(playerId);
+                this.sessions.update(playerId, session -> session.withFilter(activation.returnFilter()).withSort(activation.returnSort()).withPage(activation.returnPage()));
             }));
     }
 
